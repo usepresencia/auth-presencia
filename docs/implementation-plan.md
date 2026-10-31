@@ -8,7 +8,7 @@ Implementar login central em `https://auth.presencia.com.br`, com Firebase Auth 
 
 Este plano usa `Auth Presencia OIDC.md`, fornecido pelo usuário, como proposta de requisitos. As decisões marcadas como abertas no documento continuam abertas; recomendações abaixo não representam decisões já aprovadas ou funcionalidades existentes.
 
-Entregas: serviço de identidade, persistência e operação, biblioteca de validação, integração dos BFFs, gestão de acesso, migração de identidades e retirada controlada da autenticação legada. Roles por tenant permanecem nos produtos. Mobile fica fora da primeira entrega.
+Entregas: serviço de identidade, persistência e operação, biblioteca de validação, integração dos BFFs, gestão de acesso, migração de identidades e retirada controlada da autenticação legada. Roles por tenant permanecem nos produtos. O app Flutter AgendaFlow foi identificado no inventário e exige client público nativo com PKCE; sua integração depende de confirmar o backend. Kontal foi incluído no escopo pelo mantenedor, com web-kontal e api-kontal.
 
 ## 2. O que foi confirmado no código
 
@@ -28,7 +28,7 @@ Referências principais, relativas à raiz do workspace:
 - `ouvidoria-municipal/src/app/api/auth/callback/route.ts`, `src/lib/auth/session.ts`.
 - `payments-agendaflow/src/api/infrastructure/firebase/firebase-auth.service.ts`, `src/app/activation/_components/ActivationClient.tsx`, `src/app/activation/_hooks/use-activation-chat.ts`, `src/app/(home)/payment/_components/checkout-form.tsx`.
 
-A inspeção foi direcionada a autenticação; não constitui inventário completo de todas as rotas, integrações ou regras Firebase. Não foi localizado um projeto `api-agendaflow` nesta inspeção. O produto e suas APIs reais precisam ser identificados antes de registrar seu client.
+A inspeção foi direcionada a autenticação; não constitui inventário completo de todas as rotas, integrações ou regras Firebase. A continuação do inventário confirmou app-agendaflow (Flutter/Dart, branch dev) e fontes ainda sem backend ativo demonstrado. O nome api-agendaflow em projetos Firebase não comprova um repositório/API. Foram confirmados web-kontal e api-kontal; a inclusão do Kontal foi autorizada pelo mantenedor. Consulte docs/inventory/auth-consumers.md.
 
 ## 3. Decisões técnicas antes da implementação
 
@@ -133,15 +133,17 @@ Tratar refresh concorrente com lock/versionamento atômico, evitando que request
 
 **Aceite:** piloto interno em staging e depois coorte de produção; acesso sem MFA negado; permissões internas preservadas; chamada à api-presencia funciona com audience correta; logout limpa todas as sessões locais alcançadas. Medir falhas antes de ampliar.
 
-### Fase 4 — ouvidoria
+### Fase 4 — ouvidoria e Kontal
 
 Criar início de login e callback GET com code/state; retirar gradualmente o POST que recebe Firebase token e a página que consome token no fragmento. Resolver Funcionario por vínculo da identidade, preservando município, estado ativo e papel. Garantir que o atendimento público/anônimo continue com o comportamento atual.
 
 **Aceite:** SSO após login no console quando elegível, sem acesso para quem não tem grant ou Funcionario ativo, separação entre municípios e logout global. Gestor mantém as regras locais; MFA adicional depende da política definida na fase 0.
 
+Kontal: preparar validação de api-kontal e importação de kontalMemberships na fase 2 (#33); migrar o web-kontal para BFF OIDC nesta fase (#34), com audience exclusiva e preservação da seleção de empresa. Aceite financeiro dedicado em #35 é obrigatório antes do rollout e do corte legado.
+
 ### Fase 5 — agendaflow e payments
 
-Integrar o client/resource real identificado na fase 0. Modificar ativação, provisionamento e webhooks de pagamento para solicitar grant pela API de gestão com credencial restrita. Entregar mudanças por outbox/retry e chave idempotente; conciliar eventos atrasados, duplicados ou fora de ordem com o estado comercial vigente.
+Integrar o app-agendaflow Flutter como client público, com PKCE, browser de sistema e armazenamento seguro nativo, sem secret embutido. Confirmar sua API antes de registrar resource; o app não será tratado como um BFF Next.js. Modificar ativação, provisionamento e webhooks de pagamento para solicitar grant pela API de gestão com credencial restrita. Entregar mudanças por outbox/retry e chave idempotente; conciliar eventos atrasados, duplicados ou fora de ordem com o estado comercial vigente.
 
 Implementar a opção decidida para Firebase no browser. Separar ativação de conta, acesso ao produto e acesso ao tenant. Não retirar o fluxo de custom token antes de substituir todos os consumidores confirmados.
 
@@ -179,7 +181,7 @@ Checks por projeto na implementação: scripts existentes de typecheck/lint/buil
 
 Dependências: inventário/ADR → auth persistente → backfill e biblioteca → console + endpoints necessários da API → ouvidoria → agendaflow/payments → web-presencia/API completa → retirada do legado.
 
-A primeira entrega implementável é uma vertical em staging: auth + um client de teste com PKCE, Firebase upstream, grant persistido e API mínima com audience própria. Em seguida, completar MFA, gestão, refresh, logout e recuperação para habilitar o piloto interno. Não promover apenas discovery/JWKS como se o login central já estivesse pronto.
+A primeira entrega implementável é uma vertical em staging: auth + um client de teste com PKCE, Firebase upstream, grant persistido e API mínima com audience própria. Em seguida, completar MFA, gestão, refresh, logout e recuperação para habilitar o piloto interno. Não promover apenas discovery/JWKS como se o login central já estivesse pronto. A integração do Kontal e do app Flutter passa a fazer parte dos gates de migração; somente o mantenedor fará merge dos PRs para develop.
 
 Esforço e calendário devem ser estimados após a fase 0, sobretudo pela indefinição do agendaflow, MFA e ponte Firebase. O plano não pressupõe equipe, infraestrutura nem prazo já acordados.
 

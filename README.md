@@ -4,7 +4,7 @@ Base do serviço central de identidade da Presencia, em NestJS e TypeScript.
 
 ## Estado atual
 
-Estrutura inicial executável: validação de ambiente, health checks, testes, CI e imagem Docker. O provedor OIDC, Firebase upstream, banco, grants e login ainda serão implementados conforme o plano em [docs/implementation-plan.md](docs/implementation-plan.md). A escolha entre oidc-provider e Ory Hydra permanece pendente da prova de conceito.
+Estrutura inicial executável: validação de ambiente, health checks, testes, CI e imagem Docker. O inventário, a PoC OIDC e a primeira camada de identidade PostgreSQL estão em implementação na branch de trabalho. A integração do provedor à aplicação, Firebase upstream, grants e login seguem o plano em [docs/implementation-plan.md](docs/implementation-plan.md). A escolha entre oidc-provider e Ory Hydra permanece pendente da prova de conceito.
 
 ## Desenvolvimento
 
@@ -41,7 +41,7 @@ test/                  # configuração e integração HTTP
 docs/                  # plano e limites de arquitetura
 ```
 
-Os módulos de domínio estão vazios nesta primeira etapa. Criar camadas domain/application/infrastructure/presentation dentro de cada módulo conforme os primeiros casos de uso, evitando dependências sem utilização.
+O módulo identity já possui domínio, serviço e repositório PostgreSQL; os demais módulos aguardam seus casos de uso. Criar camadas domain/application/infrastructure/presentation dentro de cada módulo conforme os primeiros casos de uso, evitando dependências sem utilização.
 
 ## Verificação
 
@@ -77,3 +77,10 @@ Não versionar .env, chaves privadas, credenciais Firebase ou tokens. .env.examp
 ## Contribuição e backlog
 
 Consulte [os padrões do repositório](docs/repository-standards.md) para commits, hooks, releases, templates e automações. O [backlog OIDC](docs/issue-backlog.md) lista issues por fase e repositórios afetados. A documentação de API gerada por `npm run docs` fica em `docs/api/`.
+
+## Implementação em andamento
+
+- [Inventário de consumidores](docs/inventory/auth-consumers.md) e [ADR inicial](docs/adr/0001-auth-foundation.md).
+- [PoC OIDC](docs/poc/provider-evaluation.md): `npm run test:poc`.
+- [Identidade PostgreSQL](docs/identity-persistence.md): migrations explícitas e testes de integração.
+- PRs de implementação têm como destino develop; apenas o mantenedor faz merge. O plano completo continua em acompanhamento na issue #1.

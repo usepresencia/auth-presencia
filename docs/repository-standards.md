@@ -5,6 +5,7 @@ Referência: usepresencia/api-presencia, templates e convenções existentes em 
 ## Contribuição
 
 - Branches de integração: main e develop; branches de trabalho feat/, fix/, chore/ conforme a tarefa.
+- Implementação OIDC segue em PR de trabalho para develop; somente o mantenedor faz merge. Não fazer push direto em main/develop, habilitar auto-merge ou fechar issues ainda não aceitas.
 - Commits convencionais: feat, fix, chore, refactor, docs, test, ci, perf, build, style e revert.
 - npm run commit oferece Commitizen; commitlint valida mensagens no hook commit-msg e nos PRs.
 - Husky executa lint-staged no pre-commit. A validação de formatação completa fica na CI.
