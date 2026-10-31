@@ -183,7 +183,10 @@
                 "pubspec.yaml",
                 "lib/modules/auth/presentation/widgets/login_form.dart",
                 "lib/modules/client/appointments/infrastructure/datasources/api_appointments_datasource.dart"
-            ]
+            ],
+            "delivery_status": "standby",
+            "current_migration_wave": false,
+            "maintainer_confirmation": "2026-10-31: app-agendaflow is on standby; resume backend discovery and native OIDC integration when the app is resumed."
         },
         {
             "repo": "web-kontal",
@@ -238,7 +241,8 @@
         },
         {
             "issue": 26,
-            "subject": "Confirm actual AgendaFlow backend; inspected Flutter API datasource is not an active API."
+            "subject": "App AgendaFlow is on standby by maintainer confirmation. Confirm backend and integrate native OIDC when resumed.",
+            "blocking_current_wave": false
         },
         {
             "issue": 16,

@@ -19,6 +19,8 @@ A ouvidoria consulta a api-presencia: a política de resources precisa contempla
 
 ## Evidência sobre AgendaFlow
 
+**Status confirmado pelo mantenedor em 31/10/2026: app-agendaflow em standby.** Sua integração nativa (#26) fica para a retomada do app e não bloqueia a conclusão deste inventário nem a migração dos produtos ativos. O payments-agendaflow permanece no plano ativo de billing/ativação.
+
 Existe [usepresencia/app-agendaflow](https://github.com/usepresencia/app-agendaflow), com branch padrão **dev**, Flutter/Dart e aplicações Android/iOS. Em pubspec.yaml não há Firebase Auth, cliente HTTP nem biblioteca OIDC declarados. login_form.dart apenas chama onLogin; ApiAppointmentsDatasource explicita que não é usado em runtime e retorna listas vazias enquanto o backend não está disponível.
 
 Referências: [pubspec.yaml](https://github.com/usepresencia/app-agendaflow/blob/dev/pubspec.yaml), [login_form.dart](https://github.com/usepresencia/app-agendaflow/blob/dev/lib/modules/auth/presentation/widgets/login_form.dart), [ApiAppointmentsDatasource](https://github.com/usepresencia/app-agendaflow/blob/dev/lib/modules/client/appointments/infrastructure/datasources/api_appointments_datasource.dart).
@@ -36,7 +38,7 @@ Também existem repositórios de site/landing page do agendaflow; isso não demo
 | admin-console  | WEB_PRESENCIA_URL; API_PRESENCIA_URL; forms público tem default forms.presencia.com.br               | .firebaserc aponta api-agendaflow para ferramentas locais; FIREBASE_PROJECT_ID define runtime |
 | Ouvidoria      | API_PRESENCIA_URL; origem pública por ambiente                                                       | .firebaserc aponta api-agendaflow; runtime define FIREBASE_PROJECT_ID                         |
 | Payments       | NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_PRESENCIA_URL, NEXT_PUBLIC_ACTIVATE_URL, NEXT_PUBLIC_AGENDAFLOW_URL | FIREBASE_PROJECT_ID com fallback NEXT_PUBLIC_FIREBASE_PROJECT_ID                              |
-| App AgendaFlow | Redirect/app links e APIs ainda não configurados nas fontes consultadas                              | Não confirmado                                                                                |
+| App AgendaFlow | Standby; confirmar redirects/app links e API na retomada                                             | Não confirmado                                                                                |
 
 Não copiar .env ou chaves de service account para completar esta tabela. Valores reais de staging/produção, ownership dos domínios e certificados precisam ser confirmados no provisionamento. Nenhuma URL ilustrativa será cadastrada em client de produção.
 
@@ -53,12 +55,12 @@ Não copiar .env ou chaves de service account para completar esta tabela. Valore
 ## Lacunas que impedem encerrar a migração
 
 1. Confirmar projetos Firebase e domínios reais por ambiente sem divulgar segredos.
-2. Confirmar a API que servirá ao app-agendaflow; as fontes consultadas não demonstram um backend ativo.
+2. App AgendaFlow em standby por confirmação do mantenedor. Confirmar sua API na retomada da issue #26; esta descoberta fica diferida e não bloqueia a onda atual.
 3. Kontal incluído explicitamente pelo mantenedor: web-kontal (Next.js) e api-kontal (NestJS) confirmados. Importar kontalMemberships e preservar INTERNAL_ADMIN/INTERNAL_BILLING e memberships de empresa antes de trocar a autoridade. Repositório crm-presencia foi consultado e é outro monorepo; não é o web-kontal.
 4. Funcionario não possui campo de estado ativo na interface/repositório consultados. O backfill não pode pressupor que esse campo já exista; definir regra de desativação antes de importar grants.
 5. Confirmar disponibilidade de MFA no projeto/contrato Firebase e testar login real em staging.
 
-O inventário descreve o estado das fontes, inclusive dependências ainda não demonstradas. Não representa uma auditoria do ambiente de produção. A confirmação da API AgendaFlow segue pendente; o PR da issue #2 permanece em rascunho até essa confirmação ou aceite explícito da lacuna. Cadastro de clients/redirects, backfill e piloto só podem usar valores de ambiente confirmados nas issues responsáveis.
+O inventário descreve o estado das fontes, inclusive dependências ainda não demonstradas. Não representa uma auditoria do ambiente de produção. A confirmação de standby resolve a pendência de escopo da issue #2: a descoberta de backend e integração do app ficam diferidas para #26. O inventário está pronto para revisão do mantenedor. Cadastro de clients/redirects, backfill e piloto só podem usar valores de ambiente confirmados nas issues responsáveis.
 
 ## Kontal confirmado no escopo
 
@@ -88,7 +90,7 @@ São identificadores lógicos para discussão na issue #4, não cadastros de pro
 | web-admin-console   | Confidencial, BFF + MFA                                          | api-presencia; endpoints do próprio BFF               | SessionPayload.uid, registros administrativos, PlatformAccess                  |
 | ouvidoria-municipal | Confidencial, BFF                                                | api-presencia para WhatsApp; operações do próprio BFF | Funcionario.id, firebaseUid e tenantId                                         |
 | payments-agendaflow | Confidencial para sessões BFF; não confundir webhook com usuário | API de billing própria quando migrada                 | users/{uid}, workspaceId, ativação e direitos comerciais                       |
-| app-agendaflow      | Público/nativo, PKCE, sem secret                                 | Backend ainda não confirmado nas fontes inspecionadas | A definir na integração #26; não inferir vínculo pelo nome do projeto Firebase |
+| app-agendaflow      | Diferido: público/nativo, PKCE, sem secret                       | Standby; backend a confirmar na retomada              | A definir na integração #26; não inferir vínculo pelo nome do projeto Firebase |
 | web-kontal          | Confidencial, BFF                                                | api-kontal                                            | User.id, firebaseUid, memberships.companyId e empresa selecionada              |
 
 A sessão do auth terá sub próprio. O vínculo legado é projeto Firebase + UID, não e-mail e não o nome do produto. O admin-console e a ouvidoria chamam api-presencia com bearer; dar audience de outro produto a esses tokens impediria as chamadas atuais. Autorizar um resource também não substitui Membership/tenant/company e scopes locais.
@@ -150,13 +152,13 @@ Mudar o issuer sem migrar essa reconciliação poderia remover ou recriar direit
 
 ## Pendências e responsáveis
 
-| Pendência                                             | Evidência / ação necessária                                                                                | Gate de execução                     |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| Valores de deploy, projetos upstream, redirects e TLS | Preencher a partir do ambiente autorizado antes de cadastrar clients; não copiar secrets para o inventário | #15 e #9                             |
-| Backend AgendaFlow                                    | Pubspec e datasource consultados não demonstram API ativa; confirmação solicitada ao mantenedor            | #26; não registrar resource fictício |
-| Desativação de Funcionario                            | Modelo consultado tem papel/setor/tenant, sem campo ativo; definir regra de elegibilidade                  | #16 e #23                            |
-| MFA real do console                                   | AuthAdapter atual valida platformRole; suporte a fator e recuperação precisam ser confirmados/testados     | #13 e #20                            |
-| Acesso WebSocket sem bearer geral no browser          | Escolher transporte/ticket e validar isolamento/reconexão                                                  | #4, #18, #27 e #29                   |
-| Autoridade de privilégios e kontalMemberships         | Migrar todos os escritores e importar direitos antes de retirar claims                                     | #21 e #33                            |
+| Pendência                                             | Evidência / ação necessária                                                                                | Gate de execução                      |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Valores de deploy, projetos upstream, redirects e TLS | Preencher a partir do ambiente autorizado antes de cadastrar clients; não copiar secrets para o inventário | #15 e #9                              |
+| Backend AgendaFlow                                    | App em standby confirmado pelo mantenedor; backend será confirmado na retomada                             | #26 diferida; não bloqueia onda atual |
+| Desativação de Funcionario                            | Modelo consultado tem papel/setor/tenant, sem campo ativo; definir regra de elegibilidade                  | #16 e #23                             |
+| MFA real do console                                   | AuthAdapter atual valida platformRole; suporte a fator e recuperação precisam ser confirmados/testados     | #13 e #20                             |
+| Acesso WebSocket sem bearer geral no browser          | Escolher transporte/ticket e validar isolamento/reconexão                                                  | #4, #18, #27 e #29                    |
+| Autoridade de privilégios e kontalMemberships         | Migrar todos os escritores e importar direitos antes de retirar claims                                     | #21 e #33                             |
 
 Não executar cadastro de produção, concessão de grants, backfill ou corte de bearer com base apenas neste inventário. As lacunas ficam rastreadas nas entregas que dependem delas; o documento não afirma que o ambiente publicado foi verificado.
