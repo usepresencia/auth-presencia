@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.git
+.env
+.env.*
+!.env.example
+secrets
+*.pem
+*.key
+firebase-adminsdk*.json
