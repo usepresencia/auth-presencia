@@ -18,7 +18,7 @@ const issuerSchema = z.url().superRefine((value, ctx) => {
     }
 });
 
-const environmentSchema = z
+export const environmentSchema = z
     .object({
         NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
         HOST: z.string().trim().min(1).default('127.0.0.1'),

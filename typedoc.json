@@ -1,0 +1,13 @@
+{
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPoints": ["src"],
+    "entryPointStrategy": "expand",
+    "tsconfig": "tsconfig.json",
+    "out": "docs/api",
+    "exclude": ["**/*.spec.ts", "**/node_modules/**"],
+    "excludePrivate": true,
+    "readme": "none",
+    "name": "Presencia Auth",
+    "includeVersion": true,
+    "sort": ["source-order"]
+}

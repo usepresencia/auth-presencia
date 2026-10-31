@@ -13,3 +13,6 @@ secrets/
 *.pem
 *.key
 firebase-adminsdk*.json
+
+# Generated API documentation (manual docs remain versioned)
+docs/api/

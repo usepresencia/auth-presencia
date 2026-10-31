@@ -1,0 +1,36 @@
+name: CI
+
+on:
+    push:
+        branches: [develop, main]
+    pull_request:
+        branches: [develop, main]
+
+permissions:
+    contents: read
+
+jobs:
+    build:
+        name: Validate, Lint, Test, Build (NestJS)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+            - run: npm ci
+            - name: Validate commit messages
+              if: github.event_name == 'pull_request'
+              env:
+                  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+                  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+              run: npx --no-install commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+            - run: npm run format:check
+            - run: npm run lint
+            - run: npm run typecheck
+            - run: npm run test:coverage
+            - run: npm run build
+            - run: npm run docs

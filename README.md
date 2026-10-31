@@ -55,7 +55,7 @@ npm run build
 
 Depois do build, npm start inicia dist/main.js. A CI executa os mesmos checks.
 
-Na validação inicial (31/10/2026), `npm audit --omit=dev` não apontou vulnerabilidades. A árvore completa ainda apresenta 12 alertas moderados em ferramentas de desenvolvimento por dependências transitivas de minimatch. Reavaliar as atualizações dessas ferramentas sem aplicar downgrades ou overrides incompatíveis automaticamente.
+Na validação inicial (31/10/2026), `npm audit --omit=dev` não apontou vulnerabilidades. Após adicionar as ferramentas padrão de contribuição, a árvore completa apresenta 18 alertas moderados em dependências de desenvolvimento, incluindo minimatch e ferramentas legadas de changelog. Reavaliar as atualizações dessas ferramentas sem aplicar downgrades ou overrides incompatíveis automaticamente.
 
 ## Docker
 
@@ -73,3 +73,7 @@ Prova de conceito de autorização PKCE com client de teste, persistência compa
 ## Segurança e configuração
 
 Não versionar .env, chaves privadas, credenciais Firebase ou tokens. .env.example contém apenas valores de desenvolvimento. Autorização de produto e assinatura de tokens serão implementadas no serviço; roles de tenant permanecem nos produtos. Nenhum bypass de autenticação faz parte desta base.
+
+## Contribuição e backlog
+
+Consulte [os padrões do repositório](docs/repository-standards.md) para commits, hooks, releases, templates e automações. O [backlog OIDC](docs/issue-backlog.md) lista issues por fase e repositórios afetados. A documentação de API gerada por `npm run docs` fica em `docs/api/`.

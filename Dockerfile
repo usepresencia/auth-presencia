@@ -1,6 +1,7 @@
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY package*.json ./
+COPY scripts/prepare.mjs ./scripts/prepare.mjs
 RUN npm ci
 COPY tsconfig.json nest-cli.json ./
 COPY src ./src
@@ -9,6 +10,7 @@ RUN npm run build
 FROM node:24-bookworm-slim AS dependencies
 WORKDIR /app
 COPY package*.json ./
+COPY scripts/prepare.mjs ./scripts/prepare.mjs
 RUN npm ci --omit=dev && npm cache clean --force
 
 FROM node:24-bookworm-slim AS runtime

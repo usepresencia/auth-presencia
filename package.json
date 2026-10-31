@@ -16,7 +16,13 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
+        "docs": "typedoc",
+        "docs:watch": "typedoc --watch",
+        "commit": "cz",
+        "release": "standard-version",
+        "prepare": "node scripts/prepare.mjs"
     },
     "dependencies": {
         "@nestjs/common": "^12.3.2",
@@ -39,6 +45,23 @@
         "supertest": "^7.1.0",
         "typescript": "^5.9.0",
         "typescript-eslint": "^8.72.1",
-        "vitest": "^4.1.3"
+        "vitest": "^4.1.3",
+        "@commitlint/cli": "^20.1.0",
+        "@commitlint/config-conventional": "^20.0.0",
+        "@vitest/coverage-v8": "^4.1.12",
+        "commitizen": "^4.3.1",
+        "cz-conventional-changelog": "^3.3.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.2.6",
+        "standard-version": "^9.5.0",
+        "typedoc": "^0.28.17"
+    },
+    "lint-staged": {
+        "**/*.{css,scss,yaml,yml,ts,js,mjs,cjs,jsx,tsx,json,md}": "prettier --write"
+    },
+    "config": {
+        "commitizen": {
+            "path": "./node_modules/cz-conventional-changelog"
+        }
     }
 }

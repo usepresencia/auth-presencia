@@ -1,0 +1,59 @@
+name: Project Automation
+
+on:
+    issues:
+        types: [opened, reopened, closed]
+    pull_request:
+        types: [opened, reopened, closed]
+
+permissions:
+    contents: read
+
+jobs:
+    track:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check project integration
+              id: config
+              env:
+                  PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+              run: |
+                  if [ -n "$PROJECT_TOKEN" ]; then
+                    echo "enabled=true" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "enabled=false" >> "$GITHUB_OUTPUT"
+                    echo "::notice::Configure PROJECT_TOKEN to enable the organization project integration."
+                  fi
+            - name: Add item to organization project
+              id: add
+              if: steps.config.outputs.enabled == 'true'
+              uses: actions/add-to-project@v1.0.2
+              with:
+                  project-url: https://github.com/orgs/usepresencia/projects/4
+                  github-token: ${{ secrets.PROJECT_TOKEN }}
+            - name: Synchronize card status
+              if: steps.config.outputs.enabled == 'true'
+              uses: actions/github-script@v7
+              env:
+                  ITEM_ID: ${{ steps.add.outputs.itemId }}
+              with:
+                  github-token: ${{ secrets.PROJECT_TOKEN }}
+                  script: |
+                      const { organization } = await github.graphql(
+                        'query { organization(login: "usepresencia") { projectV2(number: 4) { id fields(first: 100) { nodes { ... on ProjectV2SingleSelectField { id name options { id name } } } } } } }'
+                      );
+                      const project = organization.projectV2;
+                      const field = project.fields.nodes.find(field => field.name === 'Status');
+                      const payload = context.payload;
+                      const closed = payload.action === 'closed';
+                      const done = closed && (!payload.pull_request || payload.pull_request.merged);
+                      const desired = done ? ['done', 'concluído'] : payload.pull_request && !closed ? ['in progress', 'em andamento'] : ['todo', 'backlog'];
+                      const option = field?.options.find(option => desired.includes(option.name.toLowerCase()));
+                      if (!option || !process.env.ITEM_ID) {
+                        core.notice('Item added; automatic status mapping unavailable for this project.');
+                        return;
+                      }
+                      await github.graphql(
+                        'mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) { updateProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item, fieldId: $field, value: { singleSelectOptionId: $option } }) { projectV2Item { id } } }',
+                        { project: project.id, item: process.env.ITEM_ID, field: field.id, option: option.id }
+                      );
