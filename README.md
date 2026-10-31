@@ -41,7 +41,7 @@ test/                  # configuração e integração HTTP
 docs/                  # plano e limites de arquitetura
 ```
 
-Os módulos de domínio estão vazios nesta primeira etapa. Criar camadas domain/application/infrastructure/presentation dentro de cada módulo conforme os primeiros casos de uso, evitando dependências sem utilização.
+O módulo identity possui domínio, serviço e repositório PostgreSQL; os demais aguardam seus casos de uso. Criar camadas domain/application/infrastructure/presentation dentro de cada módulo conforme os primeiros casos de uso, evitando dependências sem utilização.
 
 ## Verificação
 
@@ -77,3 +77,7 @@ Não versionar .env, chaves privadas, credenciais Firebase ou tokens. .env.examp
 ## Contribuição e backlog
 
 Consulte [os padrões do repositório](docs/repository-standards.md) para commits, hooks, releases, templates e automações. O [backlog OIDC](docs/issue-backlog.md) lista issues por fase e repositórios afetados. A documentação de API gerada por `npm run docs` fica em `docs/api/`.
+
+## Identidade persistente
+
+A issue #6 adiciona identidade UUID estável, vínculo Firebase por projeto/UID e migrations explícitas no PostgreSQL. Consulte [o contrato e a integração](docs/identity-persistence.md). A verificação Firebase e a integração OIDC pertencem às próximas issues; esta camada não publica login HTTP.
