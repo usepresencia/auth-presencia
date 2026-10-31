@@ -77,3 +77,7 @@ Não versionar .env, chaves privadas, credenciais Firebase ou tokens. .env.examp
 ## Contribuição e backlog
 
 Consulte [os padrões do repositório](docs/repository-standards.md) para commits, hooks, releases, templates e automações. O [backlog OIDC](docs/issue-backlog.md) lista issues por fase e repositórios afetados. A documentação de API gerada por `npm run docs` fica em `docs/api/`.
+
+## Inventário de autenticação
+
+O [inventário de consumidores](docs/inventory/auth-consumers.md) e seu [manifesto JSON](docs/inventory/auth-consumers.json) registram fontes de identidade, sessões, permissões, APIs chamadas e exceções a tratar na migração. Incluem AgendaFlow Flutter, Kontal e o WebSocket da Presencia. Valores reais de deploy e segredos não fazem parte desse documento.

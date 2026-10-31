@@ -1,0 +1,260 @@
+{
+    "schema_version": 1,
+    "captured_on": "2026-10-31",
+    "issue": 2,
+    "scope": "Source/configuration-contract inventory. No live deployment or user database audit. No credentials included.",
+    "consumers": [
+        {
+            "repo": "web-presencia",
+            "runtime": "Next.js BFF",
+            "ref": "feat/kontal-botao-admin",
+            "commit": "4cd6df2",
+            "working_tree_changes": true,
+            "identity_key": "Firebase UID returned by Identity Toolkit; api-presencia.User.firebaseUid",
+            "session": "presencia-auth, presencia-refresh, presencia-session, presencia-tenant; httpOnly cookies, 7 days",
+            "roles": [
+                "Membership: ADMIN, RECEPTION, PROFESSIONAL, CLIENT, SUPPORT",
+                "PlatformAccess: INTERNAL_ADMIN, INTERNAL_SUPPORT, INTERNAL_BILLING, COPYWRITE (backend); frontend PlatformRole type excludes COPYWRITE"
+            ],
+            "calls": [
+                "api-presencia HTTP bearer",
+                "api-presencia /ws/presencia with Firebase token in URL",
+                "admin-console, ouvidoria, Kontal legacy SSO transfers"
+            ],
+            "browser_firebase": [
+                "Firebase ID token returned by getWsTokenAction to WebSocket client"
+            ],
+            "config": [
+                "API_DOMAIN",
+                "NEXT_PUBLIC_API_DOMAIN",
+                "NEXT_PUBLIC_ADMIN_DOMAIN",
+                "NEXT_PUBLIC_KONTAL_DOMAIN",
+                "FIREBASE_PROJECT_ID"
+            ],
+            "evidence": [
+                "src/actions/auth.ts",
+                "src/api/auth.ts",
+                "src/lib/auth/session.ts",
+                "src/lib/auth/auth.types.ts",
+                "src/app/api/kontal-redirect/route.ts",
+                "src/app/(protected)/presencia/_hooks/usePresenciaWebSocket.ts"
+            ]
+        },
+        {
+            "repo": "api-presencia",
+            "runtime": "NestJS API / PostgreSQL",
+            "ref": "feat/platform-owner-transfer",
+            "commit": "a54e537",
+            "working_tree_changes": false,
+            "identity_key": "User.firebaseUid unique; local User.id preserved",
+            "session": "Firebase bearer; request.user from FirebaseAuthStrategy",
+            "roles": [
+                "Membership.role + isActive + tenantId",
+                "PlatformAccess.role; Firebase platformRole fallback provisions local access"
+            ],
+            "calls": [
+                "Firebase Admin",
+                "PostgreSQL",
+                "Google OAuth and provider webhooks with dedicated mechanisms"
+            ],
+            "browser_firebase": [],
+            "config": ["FIREBASE_PROJECT_ID", "CORS_ALLOWED_ORIGINS", "PORT"],
+            "evidence": [
+                "prisma/schema.prisma",
+                "src/shared/infrastructure/auth/firebase-auth.strategy.ts",
+                "src/shared/presentation/auth/auth.controller.ts",
+                "src/presencia/presentation/websocket.gateway.ts"
+            ]
+        },
+        {
+            "repo": "web-admin-console",
+            "runtime": "Next.js BFF / Firestore Admin",
+            "ref": "feat/clients-owner-transfer",
+            "commit": "d2b58cd",
+            "working_tree_changes": false,
+            "identity_key": "SessionPayload.uid; Firebase account UID",
+            "session": "admin_session containing Firebase ID token; verifyIdToken(token, true)",
+            "roles": [
+                "platformRole: INTERNAL_ADMIN, INTERNAL_SUPPORT, INTERNAL_BILLING, COPYWRITE",
+                "Firestore administrative records; api-presencia PlatformAccess writers"
+            ],
+            "calls": ["api-presencia tenants/members/platformRoles", "Firestore through Admin SDK"],
+            "browser_firebase": [],
+            "config": [
+                "FIREBASE_PROJECT_ID",
+                "WEB_PRESENCIA_URL",
+                "API_PRESENCIA_URL",
+                "FORMS_PUBLIC_URL"
+            ],
+            "firebase_cli_project": "api-agendaflow",
+            "evidence": [
+                "src/lib/auth/session.ts",
+                "src/api/infrastructure/firebase/AuthAdapter.ts",
+                "src/api/infrastructure/repositories/RepositoryFactory.ts",
+                ".firebaserc"
+            ]
+        },
+        {
+            "repo": "ouvidoria-municipal",
+            "runtime": "Next.js BFF / Firestore Admin",
+            "ref": "fix/audio-vision-cost-and-error-logging",
+            "commit": "ec25aed5",
+            "working_tree_changes": false,
+            "identity_key": "Funcionario.firebaseUid; local id + tenantId",
+            "session": "session cookie containing Firebase token; callback POST verifies revoked token, session lookup calls verifyIdToken",
+            "roles": [
+                "Funcionario.papel: gestor or funcionario; setorId; no active flag in inspected model"
+            ],
+            "calls": [
+                "api-presencia WhatsApp endpoints with bearer and x-tenant-id",
+                "Firestore Admin"
+            ],
+            "browser_firebase": ["Legacy SSO callback receives Firebase token in URL fragment"],
+            "config": ["FIREBASE_PROJECT_ID", "API_PRESENCIA_URL"],
+            "firebase_cli_project": "api-agendaflow",
+            "evidence": [
+                "src/lib/auth/session.ts",
+                "src/app/api/auth/callback/route.ts",
+                "src/app/sso-callback/page.tsx",
+                "src/domain/funcionario/Funcionario.ts",
+                "src/infrastructure/firestore/FuncionarioRepositoryImpl.ts",
+                "src/actions/whatsappConnections.ts",
+                "firestore.rules",
+                ".firebaserc"
+            ]
+        },
+        {
+            "repo": "payments-agendaflow",
+            "runtime": "Next.js / Firebase Admin + browser SDK",
+            "ref": "feat/claim-code-single-use",
+            "commit": "9330384",
+            "working_tree_changes": true,
+            "identity_key": "Firestore users/{uid}; activation token maps to Firebase uid; workspaces",
+            "session": "Firebase SDK browser session for checkout/activation; server bearer verification for admin APIs",
+            "roles": [
+                "users.role = platform_user in client guard",
+                "billing_admin_users/{uid}: role = billing_admin and isActive (independent financial access)"
+            ],
+            "calls": [
+                "Firebase Auth and users Firestore documents from browser",
+                "Billing providers/webhooks and provisioning"
+            ],
+            "browser_firebase": [
+                "ActivationClient signs in with custom token",
+                "checkout-form signs in with custom token",
+                "use-activation-chat reads users/{uid}",
+                "use-require-platform-user reads users/{uid}"
+            ],
+            "config": [
+                "FIREBASE_PROJECT_ID",
+                "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+                "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+                "NEXT_PUBLIC_APP_URL",
+                "NEXT_PUBLIC_PRESENCIA_URL",
+                "NEXT_PUBLIC_ACTIVATE_URL",
+                "NEXT_PUBLIC_AGENDAFLOW_URL"
+            ],
+            "evidence": [
+                "src/config/public-env.ts",
+                "src/api/infrastructure/firebase/firebase-auth.service.ts",
+                "src/api/infrastructure/api/admin-auth.ts",
+                "src/api/infrastructure/auth/activation-service.ts",
+                "src/app/activation/_components/ActivationClient.tsx",
+                "src/app/activation/_hooks/use-activation-chat.ts",
+                "src/app/(home)/payment/_components/checkout-form.tsx",
+                "src/lib/_hooks/use-require-platform-user.tsx"
+            ]
+        },
+        {
+            "repo": "app-agendaflow",
+            "runtime": "Flutter / Dart Android and iOS",
+            "ref": "dev",
+            "source": "GitHub",
+            "identity_key": "No production identity implementation demonstrated in inspected sources",
+            "session": "Presentation callbacks; shared_preferences declared, no secure token storage declared",
+            "roles": ["Not established in inspected auth/API templates"],
+            "calls": [
+                "ApiAppointmentsDatasource is an unused template returning empty lists; backend unconfirmed"
+            ],
+            "browser_firebase": [],
+            "config": [],
+            "oidc_client_kind": "public/native; never embed a client secret",
+            "evidence": [
+                "pubspec.yaml",
+                "lib/modules/auth/presentation/widgets/login_form.dart",
+                "lib/modules/client/appointments/infrastructure/datasources/api_appointments_datasource.dart"
+            ]
+        },
+        {
+            "repo": "web-kontal",
+            "runtime": "Next.js BFF",
+            "ref": "main",
+            "source": "GitHub",
+            "identity_key": "Firebase token verified by api-kontal; local company selection",
+            "session": "httpOnly __Host-kontal-token / __Host-kontal-tenant in production; token cookie 55 minutes",
+            "roles": [
+                "api-kontal /auth/me and /auth/tenants determine rights; companyId selection checked on server"
+            ],
+            "calls": ["api-kontal", "Presencia login for logout/SSO"],
+            "browser_firebase": ["Legacy SSO fragment delivers Firebase token to session action"],
+            "config": ["KONTAL_API_URL", "NEXT_PUBLIC_PRESENCIA_URL"],
+            "evidence": [
+                "src/actions/session.ts",
+                "src/lib/auth/session.ts",
+                "src/lib/auth/session-cookies.ts",
+                "src/lib/auth/cookie-options.ts",
+                "src/lib/config/env.ts"
+            ]
+        },
+        {
+            "repo": "api-kontal",
+            "runtime": "NestJS / PostgreSQL / Firebase Admin",
+            "ref": "main",
+            "source": "GitHub",
+            "identity_key": "User.firebaseUid linked by UserProvisioner; local User.id preserved",
+            "session": "FirebaseTokenVerifier -> UserProvisioner -> PlatformRoleResolver -> MembershipReconciler -> SessionUser",
+            "roles": [
+                "kontalMemberships claim is reconciled into local company memberships",
+                "Platform users allowed by KONTAL_PLATFORM_ROLES: INTERNAL_ADMIN and INTERNAL_BILLING",
+                "Non-platform users require an active company membership"
+            ],
+            "calls": ["Firebase Admin", "PostgreSQL"],
+            "browser_firebase": [],
+            "config": ["FIREBASE_PROJECT_ID"],
+            "evidence": [
+                "src/infrastructure/auth/firebase-auth.strategy.ts",
+                "src/infrastructure/auth/user-provisioner.ts",
+                "src/infrastructure/auth/membership.reconciler.ts",
+                "src/domain/auth/kontal-access.policy.ts",
+                "src/domain/auth/session-user.ts",
+                "src/infrastructure/auth/firebase-init.service.ts"
+            ]
+        }
+    ],
+    "migration_gates": [
+        {
+            "issue": 15,
+            "subject": "Confirm deployment origins, exact redirects, upstream projects, TLS and staging resources before registration."
+        },
+        {
+            "issue": 26,
+            "subject": "Confirm actual AgendaFlow backend; inspected Flutter API datasource is not an active API."
+        },
+        {
+            "issue": 16,
+            "subject": "Define eligible Funcionario before backfill; current model lacks an active flag."
+        },
+        {
+            "issue": 13,
+            "subject": "Confirm Firebase MFA capability and verify real step-up before admin pilot."
+        },
+        {
+            "issue": 27,
+            "subject": "Replace browser Firebase token used for WebSocket without exposing broad API access tokens."
+        },
+        {
+            "issue": 33,
+            "subject": "Preserve kontalMemberships rights before retiring claim reconciliation."
+        }
+    ]
+}
