@@ -12,7 +12,7 @@
         "start:dev": "nest start --watch",
         "build": "nest build",
         "typecheck": "tsc --noEmit",
-        "lint": "eslint src test",
+        "lint": "eslint src test scripts",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",
@@ -22,7 +22,9 @@
         "docs:watch": "typedoc --watch",
         "commit": "cz",
         "release": "standard-version",
-        "prepare": "node scripts/prepare.mjs"
+        "prepare": "node scripts/prepare.mjs",
+        "test:integration": "node --test test/integration/*.spec.mjs",
+        "db:migrate": "node scripts/migrate.mjs"
     },
     "dependencies": {
         "@nestjs/common": "^12.3.2",
@@ -31,7 +33,8 @@
         "@nestjs/platform-express": "^12.3.2",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2",
-        "zod": "^4.3.6"
+        "zod": "^4.3.6",
+        "pg": "^8.23.1"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -54,7 +57,8 @@
         "husky": "^9.1.7",
         "lint-staged": "^16.2.6",
         "standard-version": "^9.5.0",
-        "typedoc": "^0.28.17"
+        "typedoc": "^0.28.17",
+        "@types/pg": "^8.23.1"
     },
     "lint-staged": {
         "**/*.{css,scss,yaml,yml,ts,js,mjs,cjs,jsx,tsx,json,md}": "prettier --write"

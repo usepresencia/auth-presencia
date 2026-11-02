@@ -24,6 +24,13 @@ export const environmentSchema = z
         HOST: z.string().trim().min(1).default('127.0.0.1'),
         PORT: z.coerce.number().int().min(1).max(65535).default(3340),
         AUTH_ISSUER: issuerSchema,
+        DATABASE_URL: z
+            .url()
+            .refine(
+                value => ['postgres:', 'postgresql:'].includes(new URL(value).protocol),
+                'DATABASE_URL must use PostgreSQL.',
+            )
+            .optional(),
     })
     .superRefine((env, ctx) => {
         if (env.NODE_ENV === 'production' && !env.AUTH_ISSUER.startsWith('https://')) {

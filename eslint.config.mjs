@@ -7,8 +7,13 @@ export default tseslint.config(
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     {
-        files: ['**/*.ts'],
+        files: ['**/*.ts', '**/*.mjs'],
         languageOptions: { globals: globals.node },
         rules: { '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }] },
+    },
+    {
+        files: ['**/*.cjs'],
+        languageOptions: { globals: globals.node },
+        rules: { '@typescript-eslint/no-require-imports': 'off' },
     },
 );

@@ -41,7 +41,7 @@ test/                  # configuração e integração HTTP
 docs/                  # plano e limites de arquitetura
 ```
 
-Os módulos de domínio estão vazios nesta primeira etapa. Criar camadas domain/application/infrastructure/presentation dentro de cada módulo conforme os primeiros casos de uso, evitando dependências sem utilização.
+O módulo identity possui domínio, serviço e repositório PostgreSQL; os demais aguardam seus casos de uso. Criar camadas domain/application/infrastructure/presentation dentro de cada módulo conforme os primeiros casos de uso, evitando dependências sem utilização.
 
 ## Verificação
 
