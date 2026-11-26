@@ -17,7 +17,9 @@ cp .env.example .env
 npm run start:dev
 ```
 
-O serviço escuta em http://localhost:3340 por padrão. AUTH_ISSUER é obrigatório e deve representar a origem pública estável. Produção exige HTTPS. Nenhuma credencial real é necessária nesta etapa.
+Antes de iniciar, preencha o .env: `node scripts/generate-keys.mjs` imprime as chaves de assinatura, de cookies e um segredo de client. Banco, chaves, clients e Firebase são obrigatórios para a API iniciar; as variáveis estão descritas em .env.example.
+
+O serviço escuta em http://localhost:3340 por padrão. AUTH_ISSUER deve representar a origem pública estável. Produção exige HTTPS e recusa o Firebase Auth Emulator. Nenhuma credencial real é necessária em desenvolvimento.
 
 - GET /health/live: 200 quando o processo HTTP responde.
 - GET /health/ready: 503 enquanto provedor e persistência não estiverem implementados; não utilizar como readiness de uma implantação funcional ainda.
@@ -61,10 +63,10 @@ Na validação inicial (31/10/2026), `npm audit --omit=dev` não apontou vulnera
 
 ```sh
 docker build -t auth-presencia .
-docker run --rm -p 3340:3340 -e AUTH_ISSUER=https://auth.presencia.com.br auth-presencia
+docker run --rm -p 3340:3340 --env-file .env.container auth-presencia
 ```
 
-Esse comando testa apenas a base HTTP. Não configura DNS, TLS ou um provedor OIDC. O container usa Node 24 e usuário sem privilégios. Quando persistência for implementada, o health de readiness deverá verificar suas dependências reais.
+O arquivo .env.container (não versionado) precisa das mesmas variáveis do .env.example, com valores de produção e sem aspas. Esse comando testa apenas a base HTTP. Não configura DNS, TLS ou um provedor OIDC. O container usa Node 24 e usuário sem privilégios. Quando persistência for implementada, o health de readiness deverá verificar suas dependências reais.
 
 ## Próxima entrega
 

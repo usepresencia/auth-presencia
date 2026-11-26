@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -16,6 +17,12 @@ describe('application foundation', () => {
 
     afterAll(async () => {
         await app?.close();
+    });
+
+    it('exposes parsed configuration objects through ConfigService', () => {
+        const clients = app.get(ConfigService).get('AUTH_CLIENTS');
+        expect(clients[0].clientId).toBe('web-kontal');
+        expect(app.get(ConfigService).get('AUTH_COOKIE_KEYS')).toHaveLength(1);
     });
 
     it('reports process liveness', async () => {

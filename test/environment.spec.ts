@@ -1,21 +1,44 @@
 import { describe, expect, it } from 'vitest';
 import { validateEnvironment } from '../src/shared/config/environment';
 
+const valid: Record<string, string> = Object.fromEntries(
+    [
+        'AUTH_ISSUER',
+        'DATABASE_URL',
+        'AUTH_JWKS',
+        'AUTH_COOKIE_KEYS',
+        'AUTH_CLIENTS',
+        'FIREBASE_PROJECT_ID',
+        'FIREBASE_API_KEY',
+    ].map(name => [name, process.env[name] as string]),
+);
+const production = {
+    ...valid,
+    NODE_ENV: 'production',
+    AUTH_ISSUER: 'https://auth.presencia.com.br',
+    FIREBASE_PROJECT_ID: 'presencia-prod',
+};
+const client = () => JSON.parse(valid['AUTH_CLIENTS'])[0] as Record<string, unknown>;
+const rejects = (change: Record<string, unknown>, name: string, base = valid) =>
+    expect(() => validateEnvironment({ ...base, ...change })).toThrow(name);
+
 describe('environment validation', () => {
-    it('accepts a PostgreSQL URL without requiring a database for the HTTP foundation', () => {
-        expect(
-            validateEnvironment({
-                AUTH_ISSUER: 'http://localhost:3340',
-                DATABASE_URL: 'postgresql://fixture@localhost/auth_test',
-            }).DATABASE_URL,
-        ).toBeDefined();
+    it('parses keys, clients and flags into typed values', () => {
+        const env = validateEnvironment(valid);
+        expect(env.AUTH_JWKS.keys[0]?.kid).toBe('test-key');
+        expect(env.AUTH_COOKIE_KEYS).toHaveLength(1);
+        expect(env.AUTH_CLIENTS[0]?.audience).toBe('api-kontal');
+        expect(env.AUTH_TRUST_PROXY).toBe(false);
+        expect(validateEnvironment({ ...valid, AUTH_TRUST_PROXY: 'true' }).AUTH_TRUST_PROXY).toBe(
+            true,
+        );
     });
 
     it('rejects a non-PostgreSQL database URL without leaking its credentials', () => {
         let message = '';
         try {
             validateEnvironment({
-                AUTH_ISSUER: 'http://localhost:3340',
+                ...valid,
                 DATABASE_URL: 'https://fixture:sensitive@example.test/db',
             });
         } catch (error) {
@@ -25,14 +48,71 @@ describe('environment validation', () => {
         expect(message).not.toContain('sensitive');
     });
 
-    it('keeps database configuration optional until persistence is provisioned', () => {
-        expect(
-            validateEnvironment({ AUTH_ISSUER: 'http://localhost:3340' }).DATABASE_URL,
-        ).toBeUndefined();
+    it.each([
+        'DATABASE_URL',
+        'AUTH_JWKS',
+        'AUTH_COOKIE_KEYS',
+        'AUTH_CLIENTS',
+        'FIREBASE_PROJECT_ID',
+        'FIREBASE_API_KEY',
+    ])('requires %s', name => rejects({ [name]: undefined }, name));
+
+    it('rejects a public-only signing key', () => {
+        const publicKey = { ...JSON.parse(valid['AUTH_JWKS']).keys[0], d: undefined };
+        rejects({ AUTH_JWKS: JSON.stringify({ keys: [publicKey] }) }, 'AUTH_JWKS');
     });
 
+    it('rejects a cookie key shorter than 32 characters', () =>
+        rejects({ AUTH_COOKIE_KEYS: 'a'.repeat(31) }, 'AUTH_COOKIE_KEYS'));
+
+    it.each([
+        ['a short client secret', { clientSecret: 'a'.repeat(31) }],
+        ['a non-loopback http redirect', { redirectUris: ['http://kontal.example.test/cb'] }],
+        ['a redirect with fragment', { redirectUris: ['https://kontal.example.test/cb#x'] }],
+        ['an http post logout redirect', { postLogoutRedirectUris: ['http://example.test'] }],
+        ['an unknown property', { extra: true }],
+    ])('rejects a client with %s', (_name, change) =>
+        rejects({ AUTH_CLIENTS: JSON.stringify([{ ...client(), ...change }]) }, 'AUTH_CLIENTS'),
+    );
+
+    it('rejects duplicated client ids', () =>
+        rejects({ AUTH_CLIENTS: JSON.stringify([client(), client()]) }, 'AUTH_CLIENTS'));
+
+    it.each(['AUTH_JWKS', 'AUTH_CLIENTS'])('never echoes %s content in the error', name => {
+        let message = '';
+        try {
+            validateEnvironment({ ...valid, [name]: 'sensitive-not-json' });
+        } catch (error) {
+            message = (error as Error).message;
+        }
+        expect(message).toContain(name);
+        expect(message).not.toContain('sensitive');
+    });
+
+    it('accepts the emulator host outside production', () => {
+        expect(
+            validateEnvironment({ ...valid, FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099' })
+                .FIREBASE_AUTH_EMULATOR_HOST,
+        ).toBe('127.0.0.1:9099');
+    });
+
+    it('rejects the emulator host in production', () =>
+        rejects(
+            { FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099' },
+            'FIREBASE_AUTH_EMULATOR_HOST',
+            production,
+        ));
+
+    it.each(['http://127.0.0.1:9099', '127.0.0.1', 'host:9099/path'])(
+        'rejects emulator host %s',
+        host => rejects({ FIREBASE_AUTH_EMULATOR_HOST: host }, 'FIREBASE_AUTH_EMULATOR_HOST'),
+    );
+
+    it('rejects a demo- project id in production', () =>
+        rejects({ FIREBASE_PROJECT_ID: 'demo-presencia' }, 'FIREBASE_PROJECT_ID', production));
+
     it('accepts the local issuer and applies typed defaults', () => {
-        expect(validateEnvironment({ AUTH_ISSUER: 'http://localhost:3340' })).toMatchObject({
+        expect(validateEnvironment(valid)).toMatchObject({
             NODE_ENV: 'development',
             HOST: '127.0.0.1',
             PORT: 3340,
@@ -40,13 +120,11 @@ describe('environment validation', () => {
     });
 
     it('requires an explicit issuer', () => {
-        expect(() => validateEnvironment({})).toThrow('AUTH_ISSUER');
+        rejects({ AUTH_ISSUER: undefined }, 'AUTH_ISSUER');
     });
 
     it.each(['0', '65536', 'NaN', '3340.5'])('rejects invalid port %s', PORT => {
-        expect(() =>
-            validateEnvironment({ AUTH_ISSUER: 'https://auth.presencia.com.br', PORT }),
-        ).toThrow('PORT');
+        expect(() => validateEnvironment({ ...valid, PORT })).toThrow('PORT');
     });
 
     it.each([
@@ -57,22 +135,16 @@ describe('environment validation', () => {
         'https://auth.presencia.com.br#fragment',
         'file:///tmp/auth',
     ])('rejects unsafe issuer %s', AUTH_ISSUER => {
-        expect(() => validateEnvironment({ AUTH_ISSUER })).toThrow('AUTH_ISSUER');
+        rejects({ AUTH_ISSUER }, 'AUTH_ISSUER');
     });
 
     it('rejects HTTP in production even on localhost', () => {
         expect(() =>
-            validateEnvironment({ NODE_ENV: 'production', AUTH_ISSUER: 'http://localhost:3340' }),
+            validateEnvironment({ ...production, AUTH_ISSUER: 'http://localhost:3340' }),
         ).toThrow('HTTPS');
     });
 
     it('accepts a production HTTPS issuer', () => {
-        expect(
-            validateEnvironment({
-                NODE_ENV: 'production',
-                AUTH_ISSUER: 'https://auth.presencia.com.br',
-                PORT: '3340',
-            }).PORT,
-        ).toBe(3340);
+        expect(validateEnvironment({ ...production, PORT: '3340' }).PORT).toBe(3340);
     });
 });
