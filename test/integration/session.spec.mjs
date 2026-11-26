@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { createSessionExtension } from '../../dist/modules/oidc/session-extension.js';
+import { jwtClaims as claims } from '../support/fixtures.mjs';
 import { buildTestApp, oauthClient } from './support/app.mjs';
 import { Browser } from './support/browser.mjs';
 
@@ -25,7 +26,6 @@ async function signedIn(extra) {
     assert.equal(status, 200, JSON.stringify(body));
     return { person, browser: authorization.browser, tokens: body };
 }
-const claims = token => JSON.parse(Buffer.from(token.split('.')[1], 'base64url'));
 const invalidGrant = result => {
     assert.equal(result.status, 400, JSON.stringify(result.body));
     assert.equal(result.body.error, 'invalid_grant');

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
+import { jwtClaims } from '../support/fixtures.mjs';
 import { buildTestApp, oauthClient } from './support/app.mjs';
 import { Browser } from './support/browser.mjs';
 
@@ -64,7 +65,7 @@ describe('login routes for the front', () => {
             verifier: flow.verifier,
         });
         assert.equal(tokens.status, 200, JSON.stringify(tokens.body));
-        const claims = JSON.parse(Buffer.from(tokens.body.access_token.split('.')[1], 'base64url'));
+        const claims = jwtClaims(tokens.body.access_token);
         assert.equal(claims.firebase_uid, account.uid);
         assert.notEqual(claims.sub, account.uid);
     });

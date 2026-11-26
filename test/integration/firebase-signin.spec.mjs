@@ -1,23 +1,15 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
-import { deleteApp, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
 import { FirebaseAdminGateway } from '../../dist/modules/accounts/firebase-admin.gateway.js';
+import { emulatorHost, firebaseFixtures, password, projectId } from './support/firebase.mjs';
 
-const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
-if (!host) throw new Error('FIREBASE_AUTH_EMULATOR_HOST is required.');
-const projectId = 'demo-presencia';
-const password = 'fixture-password';
+const host = emulatorHost();
 const urls = [];
-let app;
-let auth;
+let fixtures;
 let gateway;
-const created = [];
 
 before(() => {
-    app = initializeApp({ projectId }, 'fixtures-' + randomUUID());
-    auth = getAuth(app);
+    fixtures = firebaseFixtures();
     gateway = new FirebaseAdminGateway(
         { FIREBASE_PROJECT_ID: projectId, FIREBASE_API_KEY: 'fake-api-key' },
         {
@@ -29,20 +21,11 @@ before(() => {
     );
 });
 after(async () => {
-    for (const uid of created) await auth.deleteUser(uid);
     await gateway?.onModuleDestroy();
-    await deleteApp(app);
+    await fixtures?.cleanup();
 });
 
-async function createUser(extra = {}) {
-    const user = await auth.createUser({
-        email: randomUUID() + '@example.test',
-        password,
-        ...extra,
-    });
-    created.push(user.uid);
-    return user;
-}
+const createUser = extra => fixtures.createUser(extra);
 
 describe('Firebase sign-in against the emulator', () => {
     it('signs in a real emulator user and returns the verified principal', async () => {

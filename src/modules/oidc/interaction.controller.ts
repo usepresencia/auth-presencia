@@ -15,6 +15,7 @@ import {
 import type { Request, Response } from 'express';
 import Provider, { errors, type InteractionResults } from 'oidc-provider';
 import { z } from 'zod';
+import { errorName } from '../../shared/utils/error-name';
 import { AccountService } from '../accounts/account.service';
 import { SignInError, type SignInFailure } from '../accounts/firebase.gateway';
 import { OIDC_PROVIDER } from './oidc.tokens';
@@ -46,10 +47,7 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
         if (error instanceof HttpException) throw error;
         if (error instanceof SignInError) throw fail(FAILURE_STATUS[error.code], error.code);
         if (error instanceof errors.SessionNotFound) throw fail(410, 'INTERACTION_EXPIRED');
-        Logger.error(
-            'Falha na interação: ' + (error instanceof Error ? error.name : 'desconhecida'),
-            'InteractionController',
-        );
+        Logger.error('Falha na interação: ' + errorName(error), 'InteractionController');
         throw fail(503, 'AUTH_UNAVAILABLE');
     }
 }

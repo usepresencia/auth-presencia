@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
-import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { Test } from '@nestjs/testing';
 import { SignInError } from '../../../dist/modules/accounts/firebase.gateway.js';
+import { kontalClient, secret, signingKey } from '../../support/fixtures.mjs';
 import { Browser } from './browser.mjs';
 import { createTestDatabase } from './database.mjs';
-
-const secret = () => randomBytes(32).toString('base64url');
 
 async function freePort() {
     const server = createServer().listen(0, '127.0.0.1');
@@ -73,24 +72,8 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
     const database = await createTestDatabase();
     const port = await freePort();
     const issuer = 'http://127.0.0.1:' + port;
-    const key = {
-        ...generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
-            format: 'jwk',
-        }),
-        kid: 'integration',
-        alg: 'RS256',
-        use: 'sig',
-    };
-    const client = {
-        clientId: 'web-kontal',
-        clientSecret: secret(),
-        redirectUris: ['http://127.0.0.1:1/callback'],
-        postLogoutRedirectUris: ['http://127.0.0.1:1/bye'],
-        resource: 'urn:presencia:api-kontal',
-        audience: 'api-kontal',
-        scope: 'api',
-        firebaseClaims: ['platformRole', 'kontalMemberships'],
-    };
+    const key = signingKey('integration');
+    const client = kontalClient('http://127.0.0.1:1/callback', 'http://127.0.0.1:1/bye');
     Object.assign(process.env, {
         NODE_ENV: 'test',
         AUTH_ISSUER: issuer,

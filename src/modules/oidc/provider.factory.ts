@@ -6,6 +6,7 @@ import Provider, {
     type Configuration,
 } from 'oidc-provider';
 import type { ClientConfig, Environment } from '../../shared/config/environment';
+import { errorName } from '../../shared/utils/error-name';
 import type { Account, AccountService } from '../accounts/account.service';
 import { absoluteRemaining, epochSeconds, sessionTtl, TTL } from './session-policy';
 
@@ -41,6 +42,15 @@ interface ProviderAccount {
     profile: Account['claims'];
     claims(): Promise<{ sub: string; [name: string]: unknown }>;
     [name: string]: unknown;
+}
+
+const logFailure = (message: string) => (error: unknown) =>
+    Logger.error(message + ': ' + errorName(error), 'OidcProvider');
+
+/** Segundos que faltam para o teto absoluto; o provedor exige ao menos um. */
+function secondsUntilCap(since: number | undefined): number {
+    const now = epochSeconds();
+    return Math.max(1, absoluteRemaining(since ?? now, now));
 }
 
 function replayedAccount(sub: string): ProviderAccount {
@@ -117,15 +127,9 @@ export function createProvider(
                 const now = epochSeconds();
                 return Math.max(1, sessionTtl(session.loginTs ?? now, now));
             },
-            Grant: ctx => {
-                const now = epochSeconds();
-                return Math.max(1, absoluteRemaining(ctx?.oidc.session?.loginTs ?? now, now));
-            },
-            RefreshToken: (_ctx, token) => {
-                const now = epochSeconds();
-                const authTime = (token as { authTime?: number }).authTime ?? now;
-                return Math.max(1, absoluteRemaining(authTime, now));
-            },
+            Grant: ctx => secondsUntilCap(ctx?.oidc.session?.loginTs),
+            RefreshToken: (_ctx, token) =>
+                secondsUntilCap((token as { authTime?: number }).authTime),
         },
         expiresWithSession: () => true,
         rotateRefreshToken: () => true,
@@ -226,21 +230,14 @@ export function createProvider(
         if (oidc?.route === 'token' && ctx.status === 200) {
             const sessionUid = oidc.entities.RefreshToken?.sessionUid;
             if (oidc.params?.['grant_type'] === 'refresh_token' && sessionUid) {
-                await extendSession(sessionUid).catch((error: unknown) =>
-                    Logger.error(
-                        'Falha ao renovar a sessão: ' +
-                            (error instanceof Error ? error.name : 'desconhecida'),
-                        'OidcProvider',
-                    ),
-                );
+                await extendSession(sessionUid).catch(logFailure('Falha ao renovar a sessão'));
             }
         }
     });
-    provider.on('server_error', (_ctx, error) =>
-        Logger.error('Falha no provedor OIDC: ' + error.name, 'OidcProvider'),
-    );
-    (provider as unknown as NodeJS.EventEmitter).on('error', (error: Error) =>
-        Logger.error('Falha na requisição OIDC: ' + error.name, 'OidcProvider'),
+    provider.on('server_error', (_ctx, error) => logFailure('Falha no provedor OIDC')(error));
+    (provider as unknown as NodeJS.EventEmitter).on(
+        'error',
+        logFailure('Falha na requisição OIDC'),
     );
     return provider;
 }
