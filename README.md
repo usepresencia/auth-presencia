@@ -15,6 +15,7 @@ nvm use
 npm ci
 cp .env.example .env    # preencha as chaves (veja abaixo)
 docker compose up -d db
+npm run emulators         # Firebase Auth Emulator, em outro terminal
 npm run prisma:generate
 npm run db:migrate
 npm run start:dev

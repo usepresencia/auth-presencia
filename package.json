@@ -27,7 +27,8 @@
         "db:migrate": "prisma migrate deploy",
         "test:poc": "node --test poc/oidc-provider.spec.mjs",
         "prisma:generate": "prisma generate",
-        "prisma:migrate": "prisma migrate dev"
+        "prisma:migrate": "prisma migrate dev",
+        "emulators": "firebase emulators:start --only auth --project demo-presencia"
     },
     "dependencies": {
         "@nestjs/common": "^12.3.2",
@@ -37,6 +38,7 @@
         "@prisma/adapter-pg": "^7.10.1",
         "@prisma/client": "^7.10.1",
         "dotenv": "^18.0.10",
+        "firebase-admin": "^14.5.1",
         "oidc-provider": "^9.15.1",
         "pg": "^8.23.1",
         "prisma": "^7.10.1",
@@ -58,6 +60,7 @@
         "commitizen": "^4.3.1",
         "cz-conventional-changelog": "^3.3.0",
         "eslint": "^10.14.0",
+        "firebase-tools": "^15.37.0",
         "globals": "^16.0.0",
         "husky": "^9.1.7",
         "jose": "^6.2.18",

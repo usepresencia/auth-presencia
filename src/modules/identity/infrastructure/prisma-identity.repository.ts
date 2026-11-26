@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { Identity as IdentityRow } from '@prisma/client';
 import type { PrismaService } from '../../../shared/infrastructure/persistence/prisma.service';
-import type { Identity, IdentityRepository, VerifiedFirebaseIdentity } from '../domain/identity';
+import type {
+    Identity,
+    IdentityRepository,
+    LinkedIdentity,
+    VerifiedFirebaseIdentity,
+} from '../domain/identity';
 
 function mapIdentity(row: IdentityRow): Identity {
     return {
@@ -15,6 +20,16 @@ function mapIdentity(row: IdentityRow): Identity {
 
 export class PrismaIdentityRepository implements IdentityRepository {
     constructor(private readonly prisma: PrismaService) {}
+
+    async findById(id: string): Promise<LinkedIdentity | null> {
+        const row = await this.prisma.identity.findUnique({
+            where: { id },
+            include: { firebaseLinks: { orderBy: { createdAt: 'asc' }, take: 1 } },
+        });
+        const link = row?.firebaseLinks[0];
+        if (!row || !link) return null;
+        return { ...mapIdentity(row), projectId: link.firebaseProjectId, uid: link.firebaseUid };
+    }
 
     async findOrCreate(principal: VerifiedFirebaseIdentity): Promise<Identity> {
         const key = {

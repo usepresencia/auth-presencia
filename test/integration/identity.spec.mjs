@@ -106,6 +106,22 @@ describe('PostgreSQL identity foundation', () => {
         assert.equal(await prisma.identity.count(), 0);
     });
 
+    it('finds an active identity by id with its firebase link', async () => {
+        const identity = await service.resolveVerifiedFirebaseIdentity(principal);
+        const found = await service.findActiveById(identity.id);
+        assert.equal(found.id, identity.id);
+        assert.equal(found.projectId, principal.projectId);
+        assert.equal(found.uid, principal.uid);
+    });
+
+    it('finds nothing for disabled, unknown or malformed ids', async () => {
+        const identity = await service.resolveVerifiedFirebaseIdentity(principal);
+        await prisma.identity.update({ where: { id: identity.id }, data: { status: 'disabled' } });
+        assert.equal(await service.findActiveById(identity.id), null);
+        assert.equal(await service.findActiveById(randomUUID()), null);
+        assert.equal(await service.findActiveById("' OR 1=1 --"), null);
+    });
+
     it('migrations are idempotent', () => {
         assert.match(migrate(database.url), /No pending migrations/);
     });
