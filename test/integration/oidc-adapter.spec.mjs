@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
-import { createPrismaAdapter } from '../../dist/modules/oidc/prisma.adapter.js';
+import { createPrismaAdapter } from '../../dist/modules/oidc/infrastructure/prisma-oidc.adapter.js';
 import { createTestDatabase } from './support/database.mjs';
 
 let database;
@@ -61,7 +61,6 @@ describe('Prisma adapter for oidc-provider', () => {
         const session = await save('Session', { jti: randomUUID(), uid: 'the-uid' });
         const found = await adapter('Session').findByUid('the-uid');
         assert.equal(found.uid, session.uid);
-        // Só o hash é gravado: a busca por uid não recupera o id.
         assert.equal(found.jti, undefined);
         const device = await save('DeviceCode', { jti: randomUUID(), userCode: 'CODE' });
         assert.equal((await adapter('DeviceCode').findByUserCode('CODE')).jti, device.jti);

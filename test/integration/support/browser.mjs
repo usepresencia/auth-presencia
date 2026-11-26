@@ -1,8 +1,6 @@
-// Navegador mínimo: cookies por nome e caminho, redirects manuais.
 export class Browser {
     cookies = new Map();
 
-    /** `origin` redireciona as requisições para outra instância, mantendo os cookies. */
     constructor({ origin } = {}) {
         this.origin = origin;
     }

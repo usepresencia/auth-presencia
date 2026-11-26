@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
+import { jwtClaims } from '../support/fixtures.mjs';
 import { buildTestApp, oauthClient } from './support/app.mjs';
 import { Browser } from './support/browser.mjs';
 
@@ -64,7 +65,7 @@ describe('login routes for the front', () => {
             verifier: flow.verifier,
         });
         assert.equal(tokens.status, 200, JSON.stringify(tokens.body));
-        const claims = JSON.parse(Buffer.from(tokens.body.access_token.split('.')[1], 'base64url'));
+        const claims = jwtClaims(tokens.body.access_token);
         assert.equal(claims.firebase_uid, account.uid);
         assert.notEqual(claims.sub, account.uid);
     });
@@ -152,7 +153,6 @@ describe('login routes for the front', () => {
             410,
             'INTERACTION_EXPIRED',
         );
-        // Mesmo enviando o cookie de outra interação para o caminho errado.
         const response = await fetch(new URL('/interaction/other/login', env.issuer), {
             method: 'POST',
             headers: {
@@ -172,7 +172,6 @@ describe('login routes for the front', () => {
         const { redirectTo } = await (await post(flow, 'login', credentials)).json();
         await oauth.follow(flow.browser, redirectTo);
         await expectCode(await post(flow, 'login', credentials), 410, 'INTERACTION_EXPIRED');
-        // Também quando o navegador reapresenta o cookie antigo.
         flow.browser.cookies = saved;
         await expectCode(await post(flow, 'login', credentials), 410, 'INTERACTION_EXPIRED');
     });
@@ -182,7 +181,6 @@ describe('login routes for the front', () => {
         const calls = env.gateway.calls;
         const original = env.gateway.signIn;
         env.gateway.signIn = async function (...parameters) {
-            // Mantém a primeira verificação em andamento até a segunda chegar.
             await setTimeout(300);
             return original.apply(this, parameters);
         };

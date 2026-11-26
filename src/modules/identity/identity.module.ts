@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../shared/infrastructure/persistence/prisma.module';
-import { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
+import { PersistenceModule } from '../persistence/persistence.module';
+import { PrismaService } from '../persistence/infrastructure/prisma.service';
 import { IdentityService } from './application/identity.service';
 import { PrismaIdentityRepository } from './infrastructure/prisma-identity.repository';
 
 @Module({
-    imports: [PrismaModule],
+    imports: [PersistenceModule],
     providers: [
         {
             provide: IdentityService,

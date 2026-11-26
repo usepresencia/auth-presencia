@@ -3,7 +3,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { PrismaIdentityRepository } from '../../dist/modules/identity/infrastructure/prisma-identity.repository.js';
 import { IdentityService } from '../../dist/modules/identity/application/identity.service.js';
-import { IdentityDisabledError } from '../../dist/modules/identity/domain/identity.js';
+import { IdentityDisabledError } from '../../dist/modules/identity/model/identity.errors.js';
 import { createTestDatabase, migrate } from './support/database.mjs';
 
 let database;

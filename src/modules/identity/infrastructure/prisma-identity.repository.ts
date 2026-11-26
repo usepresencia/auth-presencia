@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Identity as IdentityRow } from '@prisma/client';
-import type { PrismaService } from '../../../shared/infrastructure/persistence/prisma.service';
-import type {
-    Identity,
-    IdentityRepository,
-    LinkedIdentity,
-    VerifiedFirebaseIdentity,
-} from '../domain/identity';
+import type { PrismaService } from '../../persistence/infrastructure/prisma.service';
+import type { Identity, LinkedIdentity, VerifiedFirebaseIdentity } from '../model/identity';
+import type { IdentityRepository } from '../model/identity.repository';
 
 function mapIdentity(row: IdentityRow): Identity {
     return {
@@ -31,6 +27,10 @@ export class PrismaIdentityRepository implements IdentityRepository {
         return { ...mapIdentity(row), projectId: link.firebaseProjectId, uid: link.firebaseUid };
     }
 
+    /**
+     * Devolve a identidade do vínculo Firebase, criando-a no primeiro login. Chamadas
+     * concorrentes para o mesmo vínculo produzem uma única identidade.
+     */
     async findOrCreate(principal: VerifiedFirebaseIdentity): Promise<Identity> {
         const key = {
             firebaseProjectId: principal.projectId,
@@ -38,7 +38,6 @@ export class PrismaIdentityRepository implements IdentityRepository {
         };
         return this.prisma.$transaction(
             async tx => {
-                // A lock for this external key prevents orphan identities under concurrent first login.
                 await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([principal.projectId, principal.uid])}, 0))`;
                 const existing = await tx.firebaseIdentity.findUnique({
                     where: { firebaseProjectId_firebaseUid: key },
@@ -55,7 +54,6 @@ export class PrismaIdentityRepository implements IdentityRepository {
                 });
                 return mapIdentity(created);
             },
-            // Logins simultâneos da mesma conta esperam a lock em vez de falhar.
             { maxWait: 10000, timeout: 15000 },
         );
     }

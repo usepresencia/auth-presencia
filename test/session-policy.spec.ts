@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absoluteRemaining, sessionTtl } from '../src/modules/oidc/session-policy';
+import { absoluteRemaining, sessionTtl } from '../src/modules/oidc/model/session-policy';
 
 const day = 86400;
 

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { IdentityService } from '../src/modules/identity/application/identity.service';
-import { IdentityDisabledError, type Identity } from '../src/modules/identity/domain/identity';
-import { PrismaService } from '../src/shared/infrastructure/persistence/prisma.service';
+import { IdentityDisabledError } from '../src/modules/identity/model/identity.errors';
+import { type Identity } from '../src/modules/identity/model/identity';
+import { PrismaService } from '../src/modules/persistence/infrastructure/prisma.service';
 
 const principal = { projectId: 'demo-presencia', uid: 'fixture-user', emailVerified: false };
 

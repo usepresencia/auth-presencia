@@ -1,23 +1,28 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Environment } from '../../shared/config/environment';
-import { PrismaModule } from '../../shared/infrastructure/persistence/prisma.module';
-import { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
-import { AccountService } from '../accounts/account.service';
+import { pickConfig } from '../../shared/config/pick-config';
+import { PersistenceModule } from '../persistence/persistence.module';
+import { PrismaService } from '../persistence/infrastructure/prisma.service';
+import { AccountService } from '../accounts/application/account.service';
 import { AccountsModule } from '../accounts/accounts.module';
-import { InteractionController } from './interaction.controller';
+import { InteractionController } from './presentation/interaction.controller';
 import { OIDC_PROVIDER } from './oidc.tokens';
-import { createPrismaAdapter } from './prisma.adapter';
-import { LogoutController } from './logout.controller';
-import { createProvider } from './provider.factory';
-import { createSessionExtension } from './session-extension';
-
-export { OIDC_PROVIDER };
+import { LoginService } from './application/login.service';
+import { createPrismaAdapter } from './infrastructure/prisma-oidc.adapter';
+import { LogoutController } from './presentation/logout.controller';
+import { createProvider } from './infrastructure/provider/provider.factory';
+import { createSessionExtension } from './infrastructure/prisma-session.extension';
 
 @Module({
-    imports: [PrismaModule, AccountsModule],
+    imports: [PersistenceModule, AccountsModule],
     controllers: [InteractionController, LogoutController],
     providers: [
+        {
+            provide: LoginService,
+            useFactory: (accounts: AccountService) => new LoginService(accounts),
+            inject: [AccountService],
+        },
         {
             provide: OIDC_PROVIDER,
             useFactory: (
@@ -26,13 +31,14 @@ export { OIDC_PROVIDER };
                 accounts: AccountService,
             ) =>
                 createProvider(
-                    {
-                        AUTH_ISSUER: config.get('AUTH_ISSUER', { infer: true }),
-                        AUTH_JWKS: config.get('AUTH_JWKS', { infer: true }),
-                        AUTH_COOKIE_KEYS: config.get('AUTH_COOKIE_KEYS', { infer: true }),
-                        AUTH_CLIENTS: config.get('AUTH_CLIENTS', { infer: true }),
-                        AUTH_TRUST_PROXY: config.get('AUTH_TRUST_PROXY', { infer: true }),
-                    },
+                    pickConfig(
+                        config,
+                        'AUTH_ISSUER',
+                        'AUTH_JWKS',
+                        'AUTH_COOKIE_KEYS',
+                        'AUTH_CLIENTS',
+                        'AUTH_TRUST_PROXY',
+                    ),
                     createPrismaAdapter(prisma),
                     accounts,
                     createSessionExtension(prisma),
@@ -40,6 +46,6 @@ export { OIDC_PROVIDER };
             inject: [ConfigService, PrismaService, AccountService],
         },
     ],
-    exports: [OIDC_PROVIDER, AccountsModule],
+    exports: [OIDC_PROVIDER],
 })
 export class OidcModule {}

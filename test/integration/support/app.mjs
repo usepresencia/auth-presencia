@@ -1,14 +1,12 @@
-// Aplicação real (dist) em porta livre, com Postgres de teste e Firebase substituído.
 import assert from 'node:assert/strict';
-import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { Test } from '@nestjs/testing';
-import { SignInError } from '../../../dist/modules/accounts/firebase.gateway.js';
+import { SignInError } from '../../../dist/modules/accounts/model/sign-in.error.js';
+import { kontalClient, secret, signingKey } from '../../support/fixtures.mjs';
 import { Browser } from './browser.mjs';
 import { createTestDatabase } from './database.mjs';
-
-const secret = () => randomBytes(32).toString('base64url');
 
 async function freePort() {
     const server = createServer().listen(0, '127.0.0.1');
@@ -18,13 +16,11 @@ async function freePort() {
     return port;
 }
 
-/** Usuários do Firebase em memória; `down` simula indisponibilidade. */
 export function fakeGateway() {
     const users = new Map();
     return {
         users,
         down: false,
-        /** Força a falha do próximo login com este código. */
         failure: undefined,
         calls: 0,
         resets: [],
@@ -76,25 +72,8 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
     const database = await createTestDatabase();
     const port = await freePort();
     const issuer = 'http://127.0.0.1:' + port;
-    const key = {
-        ...generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
-            format: 'jwk',
-        }),
-        kid: 'integration',
-        alg: 'RS256',
-        use: 'sig',
-    };
-    const client = {
-        clientId: 'web-kontal',
-        clientSecret: secret(),
-        redirectUris: ['http://127.0.0.1:1/callback'],
-        postLogoutRedirectUris: ['http://127.0.0.1:1/bye'],
-        resource: 'urn:presencia:api-kontal',
-        audience: 'api-kontal',
-        scope: 'api',
-        firebaseClaims: ['platformRole', 'kontalMemberships'],
-    };
-    // A configuração é lida quando o AppModule é importado: definir o ambiente antes.
+    const key = signingKey('integration');
+    const client = kontalClient('http://127.0.0.1:1/callback', 'http://127.0.0.1:1/bye');
     Object.assign(process.env, {
         NODE_ENV: 'test',
         AUTH_ISSUER: issuer,
@@ -108,8 +87,8 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
     const dist = '../../../dist/';
     const { AppModule } = await import(dist + 'app.module.js');
     const { configureApp } = await import(dist + 'bootstrap.js');
-    const { FIREBASE_GATEWAY } = await import(dist + 'modules/accounts/firebase.gateway.js');
-    const { OIDC_PROVIDER } = await import(dist + 'modules/oidc/oidc.module.js');
+    const { FIREBASE_GATEWAY } = await import(dist + 'modules/accounts/model/firebase.gateway.js');
+    const { OIDC_PROVIDER } = await import(dist + 'modules/oidc/oidc.tokens.js');
     const { IdentityService } = await import(
         dist + 'modules/identity/application/identity.service.js'
     );
@@ -122,7 +101,6 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
             .compile();
         const app = module.createNestApplication({ bodyParser: false, logger: false });
         const provider = app.get(OIDC_PROVIDER);
-        // Conclui a interação de login sem depender das rotas do front.
         app.use(async (req, res, next) => {
             const match = /^\/interaction\/[^/]+\/__finish\?sub=([^&]+)$/.exec(req.url);
             if (!match) return next();
@@ -159,13 +137,11 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
             await primary.app.close();
             instances.splice(instances.indexOf(primary), 1);
             primary = await start(port);
-            // O pool do fetch ainda guarda conexões da instância encerrada: descartá-las.
             for (let attempt = 0; attempt < 5; attempt++) {
                 if (await fetch(issuer + '/health/live').catch(() => undefined)) return;
             }
             throw new Error('restarted application did not answer');
         },
-        /** Cria usuário no Firebase falso e a identidade estável correspondente. */
         async person(uid = 'uid-' + secret().slice(0, 12), extra) {
             const user = gateway.add(uid, extra);
             const identity = await primary.app
@@ -185,7 +161,6 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
     };
 }
 
-/** Passos do código de autorização vistos pelo client web-kontal. */
 export function oauthClient(env) {
     const redirectUri = env.client.redirectUris[0];
 
@@ -208,7 +183,6 @@ export function oauthClient(env) {
         return { url, verifier, state, nonce };
     }
 
-    /** Segue redirects até o client, a tela de interação ou uma resposta final. */
     async function follow(browser, start) {
         let url = new URL(start, env.issuer);
         for (let hop = 0; hop < 10; hop++) {

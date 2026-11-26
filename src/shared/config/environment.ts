@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const isLoopback = (url: URL) => ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+
 const issuerSchema = z.url().superRefine((value, ctx) => {
     const url = new URL(value);
     if (url.username || url.password || url.search || url.hash || url.pathname !== '/') {
@@ -9,8 +11,7 @@ const issuerSchema = z.url().superRefine((value, ctx) => {
                 'AUTH_ISSUER deve ser uma origem sem credenciais, caminho, query ou fragmento.',
         });
     }
-    const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) {
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopback(url))) {
         ctx.addIssue({
             code: 'custom',
             message: 'AUTH_ISSUER exige HTTPS; HTTP é permitido apenas no loopback local.',
@@ -18,16 +19,12 @@ const issuerSchema = z.url().superRefine((value, ctx) => {
     }
 });
 
-const isLoopback = (url: URL) => ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-
-/** Redirects exatos: HTTPS (ou HTTP em loopback), sem credenciais nem fragmento. */
 const redirectSchema = z.url().refine(value => {
     const url = new URL(value);
     const secure = url.protocol === 'https:' || (url.protocol === 'http:' && isLoopback(url));
     return secure && !url.username && !url.password && !value.includes('#');
 }, 'Redirect exige HTTPS (HTTP apenas em loopback), sem credenciais ou fragmento.');
 
-/** Lê JSON de uma variável sem repetir o conteúdo, que pode ter segredos, no erro. */
 function json<T extends z.ZodType>(schema: T) {
     return z
         .string()
@@ -52,7 +49,7 @@ const signingKeySchema = z.looseObject({
     d: z.string().min(1),
 });
 
-export const clientSchema = z.strictObject({
+const clientSchema = z.strictObject({
     clientId: z.string().min(1),
     clientSecret: z.string().min(32),
     redirectUris: z.array(redirectSchema).min(1),
@@ -65,7 +62,7 @@ export const clientSchema = z.strictObject({
 
 export type ClientConfig = z.infer<typeof clientSchema>;
 
-export const environmentSchema = z
+const environmentSchema = z
     .object({
         NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
         HOST: z.string().trim().min(1).default('127.0.0.1'),
@@ -75,7 +72,7 @@ export const environmentSchema = z
             .url()
             .refine(
                 value => ['postgres:', 'postgresql:'].includes(new URL(value).protocol),
-                'DATABASE_URL must use PostgreSQL.',
+                'DATABASE_URL deve usar PostgreSQL.',
             ),
         AUTH_JWKS: json(z.object({ keys: z.array(signingKeySchema).min(1) })),
         AUTH_COOKIE_KEYS: z
@@ -105,36 +102,27 @@ export const environmentSchema = z
             .optional(),
     })
     .superRefine((env, ctx) => {
-        if (env.NODE_ENV === 'production' && !env.AUTH_ISSUER.startsWith('https://')) {
-            ctx.addIssue({
-                code: 'custom',
-                path: ['AUTH_ISSUER'],
-                message: 'Produção exige issuer HTTPS.',
-            });
-        }
-        // A API atende HTTP atrás do proxy que termina o TLS; sem confiar nele os cookies
-        // sairiam sem `Secure`.
-        if (env.NODE_ENV === 'production' && !env.AUTH_TRUST_PROXY) {
-            ctx.addIssue({
-                code: 'custom',
-                path: ['AUTH_TRUST_PROXY'],
-                message: 'Produção exige proxy TLS confiável (AUTH_TRUST_PROXY=true).',
-            });
-        }
-        // O emulador aceita tokens sem assinatura: nunca em produção.
-        if (env.NODE_ENV === 'production' && env.FIREBASE_AUTH_EMULATOR_HOST) {
-            ctx.addIssue({
-                code: 'custom',
-                path: ['FIREBASE_AUTH_EMULATOR_HOST'],
-                message: 'Emulador proibido em produção.',
-            });
-        }
-        if (env.NODE_ENV === 'production' && env.FIREBASE_PROJECT_ID.startsWith('demo-')) {
-            ctx.addIssue({
-                code: 'custom',
-                path: ['FIREBASE_PROJECT_ID'],
-                message: 'Projeto demo- proibido em produção.',
-            });
+        if (env.NODE_ENV !== 'production') return;
+        const rules = [
+            ['AUTH_ISSUER', env.AUTH_ISSUER.startsWith('https://'), 'Produção exige issuer HTTPS.'],
+            [
+                'AUTH_TRUST_PROXY',
+                env.AUTH_TRUST_PROXY,
+                'Produção exige proxy TLS confiável (AUTH_TRUST_PROXY=true).',
+            ],
+            [
+                'FIREBASE_AUTH_EMULATOR_HOST',
+                !env.FIREBASE_AUTH_EMULATOR_HOST,
+                'Emulador proibido em produção.',
+            ],
+            [
+                'FIREBASE_PROJECT_ID',
+                !env.FIREBASE_PROJECT_ID.startsWith('demo-'),
+                'Projeto demo- proibido em produção.',
+            ],
+        ] as const;
+        for (const [path, valid, message] of rules) {
+            if (!valid) ctx.addIssue({ code: 'custom', path: [path], message });
         }
     });
 

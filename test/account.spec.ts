@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AccountService } from '../src/modules/accounts/account.service';
-import type { FirebaseGateway, FirebaseUser } from '../src/modules/accounts/firebase.gateway';
+import { AccountService } from '../src/modules/accounts/application/account.service';
+import type { FirebaseGateway, FirebaseUser } from '../src/modules/accounts/model/firebase.gateway';
 
 const identity = {
     id: 'sub-1',

@@ -1,9 +1,8 @@
-// Banco de teste isolado: schema aleatório com as migrations reais; nada fora dele é tocado.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { PrismaService } from '../../../dist/shared/infrastructure/persistence/prisma.service.js';
+import { PrismaService } from '../../../dist/modules/persistence/infrastructure/prisma.service.js';
 
 export function migrate(url) {
     return execFileSync('npx', ['--no-install', 'prisma', 'migrate', 'deploy'], {
