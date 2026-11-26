@@ -1,52 +1,34 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { resolve, join } from 'node:path';
-import { Pool } from 'pg';
-import { DatabaseConnection } from '../../dist/shared/infrastructure/persistence/database.js';
-import { runMigrations } from '../../dist/shared/infrastructure/persistence/migrate.js';
-import { PostgresIdentityRepository } from '../../dist/modules/identity/infrastructure/postgres-identity.repository.js';
+import { PrismaIdentityRepository } from '../../dist/modules/identity/infrastructure/prisma-identity.repository.js';
 import { IdentityService } from '../../dist/modules/identity/application/identity.service.js';
 import { IdentityDisabledError } from '../../dist/modules/identity/domain/identity.js';
+import { createTestDatabase, migrate } from './support/database.mjs';
 
-const input = process.env.INTEGRATION_DATABASE_URL;
-if (!input || !new URL(input).pathname.endsWith('_test')) {
-    throw new Error(
-        'INTEGRATION_DATABASE_URL must explicitly reference a dedicated *_test database.',
-    );
-}
-const admin = new Pool({ connectionString: input });
-const schema = 'auth_test_' + randomUUID().replaceAll('-', '');
-assert.match(schema, /^[a-z0-9_]+$/);
-const connection = new URL(input);
-connection.searchParams.set('options', '-c search_path=' + schema);
-const database = new DatabaseConnection(connection.toString());
-const service = new IdentityService(new PostgresIdentityRepository(database));
+let database;
+let prisma;
+let service;
 const principal = {
     projectId: 'demo-presencia',
     uid: 'fixture-user',
     email: 'fixture@example.test',
     emailVerified: true,
 };
-const migrations = resolve('migrations');
 
 before(async () => {
-    await admin.query('CREATE SCHEMA "' + schema + '"');
-    await runMigrations(database, migrations);
+    database = await createTestDatabase();
+    prisma = database.prisma;
+    service = new IdentityService(new PrismaIdentityRepository(prisma));
 });
 
 after(async () => {
-    await database.onModuleDestroy();
-    await admin.query('DROP SCHEMA IF EXISTS "' + schema + '" CASCADE');
-    await admin.end();
+    await database?.drop();
 });
 
 beforeEach(async () => {
-    await database.transaction(client =>
-        client.query('TRUNCATE auth_firebase_identities, auth_identities'),
-    );
+    await prisma.firebaseIdentity.deleteMany();
+    await prisma.identity.deleteMany();
 });
 
 describe('PostgreSQL identity foundation', () => {
@@ -56,10 +38,7 @@ describe('PostgreSQL identity foundation', () => {
         );
         assert.equal(new Set(identities.map(i => i.id)).size, 1);
         assert.notEqual(identities[0].id, principal.uid);
-        const result = await database.transaction(client =>
-            client.query('SELECT count(*)::int AS count FROM auth_identities'),
-        );
-        assert.equal(result.rows[0].count, 1);
+        assert.equal(await prisma.identity.count(), 1);
     });
 
     it('never merges by email or UID across Firebase projects', async () => {
@@ -77,19 +56,12 @@ describe('PostgreSQL identity foundation', () => {
 
     it('denies disabled identities without creating replacements', async () => {
         const identity = await service.resolveVerifiedFirebaseIdentity(principal);
-        await database.transaction(client =>
-            client.query("UPDATE auth_identities SET status = 'disabled' WHERE id = $1", [
-                identity.id,
-            ]),
-        );
+        await prisma.identity.update({ where: { id: identity.id }, data: { status: 'disabled' } });
         await assert.rejects(
             service.resolveVerifiedFirebaseIdentity(principal),
             IdentityDisabledError,
         );
-        const result = await database.transaction(client =>
-            client.query('SELECT count(*)::int AS count FROM auth_identities'),
-        );
-        assert.equal(result.rows[0].count, 1);
+        assert.equal(await prisma.identity.count(), 1);
     });
 
     it('treats external UID as a parameter, including SQL-like characters', async () => {
@@ -104,38 +76,37 @@ describe('PostgreSQL identity foundation', () => {
         await assert.rejects(
             service.resolveVerifiedFirebaseIdentity({ ...principal, projectId: '../other' }),
         );
-        const result = await database.transaction(client =>
-            client.query('SELECT count(*)::int AS count FROM auth_identities'),
+        assert.equal(await prisma.identity.count(), 0);
+    });
+
+    it('keeps the database constraints on status and external keys', async () => {
+        await assert.rejects(
+            prisma.identity.create({ data: { id: randomUUID(), status: 'unknown' } }),
         );
-        assert.equal(result.rows[0].count, 0);
+        const identity = await prisma.identity.create({ data: { id: randomUUID() } });
+        await assert.rejects(
+            prisma.firebaseIdentity.create({
+                data: { firebaseProjectId: '', firebaseUid: 'uid', identityId: identity.id },
+            }),
+        );
+        await prisma.firebaseIdentity.create({
+            data: { firebaseProjectId: 'demo', firebaseUid: 'uid', identityId: identity.id },
+        });
+        await assert.rejects(prisma.identity.delete({ where: { id: identity.id } }));
     });
 
     it('rolls back a failed transaction', async () => {
         await assert.rejects(
-            database.transaction(async client => {
-                await client.query('INSERT INTO auth_identities (id) VALUES ($1)', [randomUUID()]);
+            prisma.$transaction(async tx => {
+                await tx.identity.create({ data: { id: randomUUID() } });
                 throw new Error('fixture rollback');
             }),
             /fixture rollback/,
         );
-        const result = await database.transaction(client =>
-            client.query('SELECT count(*)::int AS count FROM auth_identities'),
-        );
-        assert.equal(result.rows[0].count, 0);
+        assert.equal(await prisma.identity.count(), 0);
     });
 
-    it('migrations are idempotent and detect edits to applied files', async () => {
-        assert.deepEqual(await runMigrations(database, migrations), []);
-        const directory = await mkdtemp(join(tmpdir(), 'presencia-migration-'));
-        try {
-            const sql = await readFile(join(migrations, '001_identity.sql'), 'utf8');
-            await writeFile(join(directory, '001_identity.sql'), sql + '\\n-- changed fixture\\n');
-            await assert.rejects(
-                runMigrations(database, directory),
-                /applied migration was modified/,
-            );
-        } finally {
-            await rm(directory, { recursive: true, force: true });
-        }
+    it('migrations are idempotent', () => {
+        assert.match(migrate(database.url), /No pending migrations/);
     });
 });

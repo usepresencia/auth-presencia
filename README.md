@@ -13,7 +13,10 @@ Use Node.js 24.15 ou superior na linha 24 LTS (arquivo .nvmrc) e npm.
 ```sh
 nvm use
 npm ci
-cp .env.example .env
+cp .env.example .env    # preencha as chaves (veja abaixo)
+docker compose up -d db
+npm run prisma:generate
+npm run db:migrate
 npm run start:dev
 ```
 

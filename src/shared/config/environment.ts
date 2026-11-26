@@ -52,7 +52,7 @@ const signingKeySchema = z.looseObject({
     d: z.string().min(1),
 });
 
-const clientSchema = z.strictObject({
+export const clientSchema = z.strictObject({
     clientId: z.string().min(1),
     clientSecret: z.string().min(32),
     redirectUris: z.array(redirectSchema).min(1),
