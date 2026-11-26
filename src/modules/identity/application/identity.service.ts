@@ -31,11 +31,9 @@ const principalSchema = z
     })
     .strict();
 
-/** Resolves a verified external principal; does not authenticate tokens or grant product access. */
 export class IdentityService {
     constructor(private readonly repository: IdentityRepository) {}
 
-    /** Identidade ativa pelo `sub`; entrada que não é UUID não chega ao banco. */
     async findActiveById(id: string): Promise<LinkedIdentity | null> {
         if (!z.uuid().safeParse(id).success) return null;
         const identity = await this.repository.findById(id);

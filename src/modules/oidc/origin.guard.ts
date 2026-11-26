@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { Environment } from '../../shared/config/environment';
 
-/** Proteção contra CSRF: requisições que alteram estado só partem da origem do auth. */
 @Injectable()
 export class OriginGuard implements CanActivate {
     private readonly origin: string;

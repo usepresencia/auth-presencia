@@ -39,7 +39,6 @@ function parseBody<T>(schema: z.ZodType<T>, request: Request): T {
     return result.data;
 }
 
-/** Converte falhas do Firebase e da persistência no contrato do front, sem detalhes. */
 async function guarded<T>(operation: () => Promise<T>): Promise<T> {
     try {
         return await operation();
@@ -47,7 +46,6 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
         if (error instanceof HttpException) throw error;
         if (error instanceof SignInError) throw fail(FAILURE_STATUS[error.code], error.code);
         if (error instanceof errors.SessionNotFound) throw fail(410, 'INTERACTION_EXPIRED');
-        // Só o tipo: mensagens podem conter dados da requisição.
         Logger.error(
             'Falha na interação: ' + (error instanceof Error ? error.name : 'desconhecida'),
             'InteractionController',
@@ -56,14 +54,9 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
     }
 }
 
-/**
- * Rotas consumidas pelo front de login. Ficam sob `/interaction/:uid/` para receber o cookie
- * da interação; `GET /interaction/:uid` pertence ao front.
- */
 @Controller('interaction/:uid')
 @UseGuards(OriginGuard)
 export class InteractionController {
-    /** Verificações de senha em andamento, por interação e credenciais (só nesta instância). */
     private readonly signingIn = new Map<string, Promise<string>>();
 
     constructor(
@@ -94,9 +87,7 @@ export class InteractionController {
     ) {
         return guarded(async () => {
             const body = parseBody(loginSchema, request);
-            // Antes do Firebase: sem interação válida não há tentativa de senha.
             const interaction = await this.pending(uid, request, response);
-            // Reenvio de um login já aceito: devolver o mesmo destino, sem testar a senha.
             if (interaction.result?.login) return { redirectTo: interaction.returnTo };
             const accountId = await this.signInOnce(uid, body.email, body.password);
             return this.finish(request, response, { login: { accountId, remember: true } });
@@ -130,7 +121,10 @@ export class InteractionController {
         });
     }
 
-    /** Envios idênticos e simultâneos compartilham uma única tentativa no Firebase. */
+    /**
+     * Autentica compartilhando uma única tentativa entre envios idênticos e simultâneos da
+     * mesma interação, nesta instância.
+     */
     private signInOnce(uid: string, email: string, password: string): Promise<string> {
         const key = createHash('sha256')
             .update(JSON.stringify([uid, email, password]))

@@ -1,7 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import type Provider from 'oidc-provider';
 
-/** Únicos caminhos entregues ao provedor; o restante segue para as rotas do Nest. */
 const PROVIDER_PATHS = [
     '/.well-known/openid-configuration',
     '/jwks',
@@ -11,11 +10,14 @@ const PROVIDER_PATHS = [
     '/session',
 ];
 
-/** Rotas do Nest sob prefixos do provedor. */
 const NEST_PATHS = ['/session/logout-details'];
 
 const matches = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/');
 
+/**
+ * Entrega ao provedor somente os caminhos do protocolo; `/authorize` aceita apenas GET ou
+ * HEAD com `response_mode=query`.
+ */
 export function oidcMiddleware(provider: Provider) {
     const handle = provider.callback();
     return (request: Request, response: Response, next: NextFunction): void => {
@@ -24,8 +26,6 @@ export function oidcMiddleware(provider: Provider) {
         if (!PROVIDER_PATHS.some(prefix => matches(path, prefix))) return next();
         if (NEST_PATHS.some(prefix => matches(path, prefix))) return next();
 
-        // `form_post` devolveria HTML e `fragment` exporia o code ao navegador. Só GET com
-        // `query` chega ao início da autorização.
         if (path === '/authorize' || path === '/authorize/') {
             if (request.method !== 'GET' && request.method !== 'HEAD') {
                 response.setHeader('allow', 'GET, HEAD');

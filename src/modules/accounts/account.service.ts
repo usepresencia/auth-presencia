@@ -8,13 +8,10 @@ export interface Account {
 }
 
 export interface LoadOptions {
-    /** Claims customizadas do Firebase que o client pode receber. */
     firebaseClaims: string[];
-    /** Momento do login (epoch em segundos); revogação posterior invalida a conta. */
     authTime?: number;
 }
 
-/** Monta a conta usada nos tokens. Não decide acesso a produto. */
 export class AccountService {
     constructor(
         private readonly identities: Pick<
@@ -25,7 +22,6 @@ export class AccountService {
         private readonly projectId: string,
     ) {}
 
-    /** Autentica por e-mail e senha e devolve o `sub` estável. */
     async signIn(email: string, password: string): Promise<string> {
         const principal = await this.firebase.signIn(email, password);
         try {
@@ -42,6 +38,12 @@ export class AccountService {
         await this.firebase.sendPasswordReset(email);
     }
 
+    /**
+     * Monta a conta usada nos tokens a partir da identidade e do Firebase.
+     *
+     * @returns `null` se a identidade ou o usuário não existir, estiver desativado, pertencer a
+     * outro projeto ou tiver credenciais revogadas depois de `authTime`.
+     */
     async load(sub: string, options: LoadOptions): Promise<Account | null> {
         const identity = await this.identities.findActiveById(sub);
         if (!identity || identity.projectId !== this.projectId) return null;
@@ -60,7 +62,6 @@ export class AccountService {
             email_verified: user.emailVerified,
             name: user.name,
         };
-        // As claims padrão vêm por último: claim customizada nunca as substitui.
         const claims = Object.fromEntries(
             [...custom, ...Object.entries(standard)].filter(([, value]) => value !== undefined),
         );

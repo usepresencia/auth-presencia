@@ -4,10 +4,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import type { Environment } from '../../config/environment';
 
-/**
- * Cliente de banco com pool PostgreSQL. A conexão abre na primeira consulta, para que o
- * liveness responda mesmo com o banco indisponível.
- */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
     constructor(config: ConfigService<Environment, true>) {

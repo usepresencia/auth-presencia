@@ -20,14 +20,12 @@ const issuerSchema = z.url().superRefine((value, ctx) => {
 
 const isLoopback = (url: URL) => ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
 
-/** Redirects exatos: HTTPS (ou HTTP em loopback), sem credenciais nem fragmento. */
 const redirectSchema = z.url().refine(value => {
     const url = new URL(value);
     const secure = url.protocol === 'https:' || (url.protocol === 'http:' && isLoopback(url));
     return secure && !url.username && !url.password && !value.includes('#');
 }, 'Redirect exige HTTPS (HTTP apenas em loopback), sem credenciais ou fragmento.');
 
-/** Lê JSON de uma variável sem repetir o conteúdo, que pode ter segredos, no erro. */
 function json<T extends z.ZodType>(schema: T) {
     return z
         .string()
@@ -52,7 +50,7 @@ const signingKeySchema = z.looseObject({
     d: z.string().min(1),
 });
 
-export const clientSchema = z.strictObject({
+const clientSchema = z.strictObject({
     clientId: z.string().min(1),
     clientSecret: z.string().min(32),
     redirectUris: z.array(redirectSchema).min(1),
@@ -65,7 +63,7 @@ export const clientSchema = z.strictObject({
 
 export type ClientConfig = z.infer<typeof clientSchema>;
 
-export const environmentSchema = z
+const environmentSchema = z
     .object({
         NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
         HOST: z.string().trim().min(1).default('127.0.0.1'),
@@ -112,8 +110,6 @@ export const environmentSchema = z
                 message: 'Produção exige issuer HTTPS.',
             });
         }
-        // A API atende HTTP atrás do proxy que termina o TLS; sem confiar nele os cookies
-        // sairiam sem `Secure`.
         if (env.NODE_ENV === 'production' && !env.AUTH_TRUST_PROXY) {
             ctx.addIssue({
                 code: 'custom',
@@ -121,7 +117,6 @@ export const environmentSchema = z
                 message: 'Produção exige proxy TLS confiável (AUTH_TRUST_PROXY=true).',
             });
         }
-        // O emulador aceita tokens sem assinatura: nunca em produção.
         if (env.NODE_ENV === 'production' && env.FIREBASE_AUTH_EMULATOR_HOST) {
             ctx.addIssue({
                 code: 'custom',

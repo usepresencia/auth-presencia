@@ -36,7 +36,6 @@ async function sessionRow(sub) {
     return rows.find(row => row.payload.accountId === sub);
 }
 
-/** Envelhece a sessão no banco, junto da concessão e dos refresh tokens do mesmo login. */
 async function ageSession(sub, { loginAgo, expiresIn }) {
     const row = await sessionRow(sub);
     const exp = now() + expiresIn;
@@ -65,7 +64,6 @@ async function ageSession(sub, { loginAgo, expiresIn }) {
         });
     }
 }
-/** Quanto resta ao refresh token mais novo (ainda não consumido) da pessoa. */
 async function refreshRemaining(sub) {
     const rows = await env.database.prisma.oidcArtifact.findMany({
         where: { model: 'RefreshToken', consumedAt: null },
@@ -230,7 +228,6 @@ describe('session lifetime', () => {
                     where,
                     data: { payload: { ...row.payload, state: { secret: 'pending-logout' } } },
                 });
-                // A renovação começa com a gravação acima ainda sem commit.
                 extension = extend(row.payload.uid);
                 await setTimeout(500);
             },
@@ -266,6 +263,29 @@ describe('session lifetime', () => {
             near(await refreshRemaining(person.sub), 14 * day - loginAgo);
         });
     }
+
+    it('replaces the grant of an earlier login so it covers the new session', async () => {
+        const { person, browser } = await signedIn();
+        await ageSession(person.sub, { loginAgo: 13 * day, expiresIn: day });
+        const request = oauth.authorizationRequest({ prompt: 'login' });
+        const started = await oauth.follow(browser, request.url);
+        const finished = await oauth.follow(
+            browser,
+            started.front.pathname + '/__finish?sub=' + person.sub,
+        );
+        const { body } = await oauth.exchange({
+            code: finished.callback.searchParams.get('code'),
+            verifier: request.verifier,
+        });
+        assert.equal((await oauth.refresh(body.refresh_token)).status, 200);
+        const grants = await env.database.prisma.oidcArtifact.findMany({
+            where: { model: 'Grant' },
+        });
+        const latest = Math.max(
+            ...grants.filter(g => g.payload.accountId === person.sub).map(g => g.payload.exp),
+        );
+        near(latest - now(), 14 * day);
+    });
 
     it('refuses refresh once the session expired', async () => {
         const { person, tokens } = await signedIn();

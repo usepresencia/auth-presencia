@@ -6,7 +6,6 @@ export interface Identity {
     createdAt: Date;
 }
 
-/** Internal contract: values must originate from a trusted Firebase verifier. */
 export interface VerifiedFirebaseIdentity {
     projectId: string;
     uid: string;
@@ -14,7 +13,6 @@ export interface VerifiedFirebaseIdentity {
     emailVerified: boolean;
 }
 
-/** Identidade com o vínculo Firebase usado para consultar a conta de origem. */
 export interface LinkedIdentity extends Identity {
     projectId: string;
     uid: string;

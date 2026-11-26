@@ -39,6 +39,6 @@ import { FIREBASE_GATEWAY, type FirebaseGateway } from './firebase.gateway';
             inject: [IdentityService, FIREBASE_GATEWAY, ConfigService],
         },
     ],
-    exports: [AccountService, FIREBASE_GATEWAY, IdentityModule],
+    exports: [AccountService],
 })
 export class AccountsModule {}

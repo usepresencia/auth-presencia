@@ -6,7 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Identidade estável do auth; `id` é o `sub` dos tokens.
 model Identity {
   id            String             @id @db.Uuid
   status        String             @default("active")
@@ -18,7 +17,6 @@ model Identity {
   @@map("auth_identities")
 }
 
-/// Vínculo externo: projeto Firebase + UID.
 model FirebaseIdentity {
   firebaseProjectId String   @map("firebase_project_id")
   firebaseUid       String   @map("firebase_uid")
@@ -31,7 +29,6 @@ model FirebaseIdentity {
   @@map("auth_firebase_identities")
 }
 
-/// Artefatos do protocolo (oidc-provider): sessões, códigos, tokens e concessões.
 model OidcArtifact {
   model      String
   id         String

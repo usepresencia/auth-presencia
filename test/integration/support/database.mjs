@@ -1,4 +1,3 @@
-// Banco de teste isolado: schema aleatório com as migrations reais; nada fora dele é tocado.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';

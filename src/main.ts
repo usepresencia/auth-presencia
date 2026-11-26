@@ -16,7 +16,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch(() => {
-    // Do not log configuration payloads: future variables may contain secrets.
     Logger.error('Falha ao iniciar auth-presencia. Verifique a configuração e a infraestrutura.');
     process.exitCode = 1;
 });

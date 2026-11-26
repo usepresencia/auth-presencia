@@ -20,7 +20,6 @@ export type FirebaseSettings = Pick<
 > &
     Partial<Pick<Environment, 'FIREBASE_API_KEY'>>;
 
-/** Pontos de substituição para testes. */
 export interface FirebaseOverrides {
     fetch?: typeof fetch;
     verifyIdToken?: (
@@ -46,7 +45,6 @@ interface ToolkitResponse {
     error?: { message?: string };
 }
 
-/** O Toolkit devolve o código seguido, às vezes, de " : detalhe". */
 function errorCode(body: ToolkitResponse): string {
     return body.error?.message?.split(' ')[0] ?? '';
 }
@@ -65,7 +63,6 @@ export class FirebaseAdminGateway implements FirebaseGateway, OnModuleDestroy {
         const projectId = settings.FIREBASE_PROJECT_ID;
         this.projectId = projectId;
         this.apiKey = settings.FIREBASE_API_KEY ?? '';
-        // O Admin SDK lê o host do emulador do ambiente; com ele, não há credencial.
         const emulator =
             settings.FIREBASE_AUTH_EMULATOR_HOST ?? process.env.FIREBASE_AUTH_EMULATOR_HOST;
         this.toolkitUrl = emulator
@@ -140,12 +137,10 @@ export class FirebaseAdminGateway implements FirebaseGateway, OnModuleDestroy {
         });
         if (!body.error) return;
         const code = errorCode(body);
-        // Conta inexistente ou desativada responde como sucesso, para não ser revelada.
         if (code === 'EMAIL_NOT_FOUND' || code === 'USER_DISABLED') return;
         throw this.failure(body);
     }
 
-    /** Chama o Identity Toolkit. Erros nunca carregam URL, chave ou corpo da requisição. */
     private async toolkit(operation: string, payload: object): Promise<ToolkitResponse> {
         const request = this.overrides.fetch ?? fetch;
         try {

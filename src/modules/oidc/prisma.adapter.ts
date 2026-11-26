@@ -3,12 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { errors, type Adapter, type AdapterPayload } from 'oidc-provider';
 import type { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
 
-/**
- * Modelos cujo id é uma credencial apresentada pelo client ou pelo navegador: só o hash é
- * gravado. O id de Interaction fica de fora porque já aparece na URL.
- */
 const SECRET_ID_MODELS = new Set(['AuthorizationCode', 'RefreshToken', 'Session']);
-/** Modelos que morrem com a concessão. Outros, como Interaction, apenas a referenciam. */
 const GRANTABLE_MODELS = new Set([
     'AccessToken',
     'AuthorizationCode',
@@ -44,7 +39,6 @@ class PrismaAdapter implements Adapter {
         };
         const where = { model_id: { model: this.model, id: this.key(id) } };
         await this.removeExpired();
-        // `consumedAt` fica de fora do update: regravar nunca devolve um artefato ao uso.
         await this.prisma.oidcArtifact.upsert({
             where,
             create: { model: this.model, id: this.key(id), ...data },
@@ -75,7 +69,11 @@ class PrismaAdapter implements Adapter {
         return row ? toPayload(row) : undefined;
     }
 
-    /** Consumo atômico. Quem perde a disputa é reuso: a concessão inteira é revogada. */
+    /**
+     * Marca o artefato como consumido de forma atômica.
+     *
+     * @throws InvalidGrant se já estava consumido, após revogar a concessão inteira.
+     */
     async consume(id: string): Promise<void> {
         const where = { model: this.model, id: this.key(id) };
         const { count } = await this.prisma.oidcArtifact.updateMany({
@@ -120,7 +118,6 @@ class PrismaAdapter implements Adapter {
     }
 }
 
-/** A interação guarda o id da sessão, que o provedor não relê: não é gravado. */
 function withoutSessionCookie(payload: AdapterPayload): AdapterPayload {
     const session = payload['session'] as Record<string, unknown> | undefined;
     if (!session) return payload;
@@ -139,7 +136,6 @@ function toPayload(row: { payload: Prisma.JsonValue; consumedAt: Date | null }):
         : payload;
 }
 
-/** Fábrica no formato esperado pela opção `adapter` do oidc-provider. */
 export function createPrismaAdapter(prisma: PrismaService): (model: string) => Adapter {
     return model => new PrismaAdapter(prisma, model);
 }

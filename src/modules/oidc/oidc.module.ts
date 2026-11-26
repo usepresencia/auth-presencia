@@ -40,6 +40,6 @@ export { OIDC_PROVIDER };
             inject: [ConfigService, PrismaService, AccountService],
         },
     ],
-    exports: [OIDC_PROVIDER, AccountsModule],
+    exports: [OIDC_PROVIDER],
 })
 export class OidcModule {}

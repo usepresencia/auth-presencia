@@ -5,8 +5,8 @@ import { epochSeconds, sessionTtl } from './session-policy';
 const ATTEMPTS = 3;
 
 /**
- * Renova a janela ociosa quando o produto usa o refresh token. Só grava sobre o conteúdo que
- * leu: uma alteração ou um logout simultâneo nunca é desfeito.
+ * Devolve a função que renova a janela ociosa de uma sessão existente, respeitando o teto
+ * absoluto. A gravação só ocorre se a sessão não mudou desde a leitura.
  */
 export function createSessionExtension(prisma: PrismaService): (uid: string) => Promise<void> {
     return async uid => {

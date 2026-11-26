@@ -152,7 +152,6 @@ describe('login routes for the front', () => {
             410,
             'INTERACTION_EXPIRED',
         );
-        // Mesmo enviando o cookie de outra interação para o caminho errado.
         const response = await fetch(new URL('/interaction/other/login', env.issuer), {
             method: 'POST',
             headers: {
@@ -172,7 +171,6 @@ describe('login routes for the front', () => {
         const { redirectTo } = await (await post(flow, 'login', credentials)).json();
         await oauth.follow(flow.browser, redirectTo);
         await expectCode(await post(flow, 'login', credentials), 410, 'INTERACTION_EXPIRED');
-        // Também quando o navegador reapresenta o cookie antigo.
         flow.browser.cookies = saved;
         await expectCode(await post(flow, 'login', credentials), 410, 'INTERACTION_EXPIRED');
     });
@@ -182,7 +180,6 @@ describe('login routes for the front', () => {
         const calls = env.gateway.calls;
         const original = env.gateway.signIn;
         env.gateway.signIn = async function (...parameters) {
-            // Mantém a primeira verificação em andamento até a segunda chegar.
             await setTimeout(300);
             return original.apply(this, parameters);
         };
