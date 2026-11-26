@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
+import { createSessionExtension } from '../../dist/modules/oidc/session-extension.js';
 import { buildTestApp, oauthClient } from './support/app.mjs';
 import { Browser } from './support/browser.mjs';
 
@@ -34,7 +36,7 @@ async function sessionRow(sub) {
     return rows.find(row => row.payload.accountId === sub);
 }
 
-/** Envelhece a sessão no banco: momento do login e fim da janela atual. */
+/** Envelhece a sessão no banco, junto da concessão e dos refresh tokens do mesmo login. */
 async function ageSession(sub, { loginAgo, expiresIn }) {
     const row = await sessionRow(sub);
     const exp = now() + expiresIn;
@@ -45,6 +47,30 @@ async function ageSession(sub, { loginAgo, expiresIn }) {
             expiresAt: new Date(exp * 1000),
         },
     });
+    const related = await env.database.prisma.oidcArtifact.findMany({
+        where: { model: { in: ['Grant', 'RefreshToken'] } },
+    });
+    const absolute = now() - loginAgo + 14 * day;
+    for (const item of related.filter(item => item.payload.accountId === sub)) {
+        await env.database.prisma.oidcArtifact.update({
+            where: { model_id: { model: item.model, id: item.id } },
+            data: {
+                payload: {
+                    ...item.payload,
+                    exp: absolute,
+                    ...(item.model === 'RefreshToken' ? { authTime: now() - loginAgo } : {}),
+                },
+                expiresAt: new Date(absolute * 1000),
+            },
+        });
+    }
+}
+/** Quanto resta ao refresh token mais novo (ainda não consumido) da pessoa. */
+async function refreshRemaining(sub) {
+    const rows = await env.database.prisma.oidcArtifact.findMany({
+        where: { model: 'RefreshToken', consumedAt: null },
+    });
+    return rows.find(row => row.payload.accountId === sub).payload.exp - now();
 }
 const remaining = async sub => (await sessionRow(sub)).payload.exp - now();
 const near = (actual, expected) =>
@@ -75,6 +101,32 @@ describe('refresh tokens', () => {
                 invalidGrant(await oauth.refresh(winner.body.refresh_token));
             }
         }
+    });
+
+    it('lets at most one of eight concurrent refreshes succeed', async () => {
+        const { tokens } = await signedIn();
+        const results = await Promise.all(
+            Array.from({ length: 8 }, () => oauth.refresh(tokens.refresh_token)),
+        );
+        const winners = results.filter(r => r.status === 200);
+        assert.ok(winners.length <= 1, JSON.stringify(results));
+        for (const loser of results.filter(r => r.status !== 200)) invalidGrant(loser);
+        for (const winner of winners) {
+            invalidGrant(await oauth.refresh(winner.body.refresh_token));
+        }
+    });
+
+    it('revokes the family on replay even while firebase is unavailable', async () => {
+        const { tokens } = await signedIn();
+        const rotated = await oauth.refresh(tokens.refresh_token);
+        assert.equal(rotated.status, 200, JSON.stringify(rotated.body));
+        env.gateway.down = true;
+        try {
+            invalidGrant(await oauth.refresh(tokens.refresh_token));
+        } finally {
+            env.gateway.down = false;
+        }
+        invalidGrant(await oauth.refresh(rotated.body.refresh_token));
     });
 
     it('reloads firebase claims on refresh', async () => {
@@ -166,6 +218,30 @@ describe('session lifetime', () => {
         assert.ok(created[0].payload.exp - now() <= 600, String(created[0].payload.exp - now()));
     });
 
+    it('does not overwrite a session change saved while it is being extended', async () => {
+        const { person } = await signedIn();
+        const row = await sessionRow(person.sub);
+        const extend = createSessionExtension(env.database.prisma);
+        const where = { model_id: { model: 'Session', id: row.id } };
+        let extension;
+        await env.database.prisma.$transaction(
+            async transaction => {
+                await transaction.oidcArtifact.update({
+                    where,
+                    data: { payload: { ...row.payload, state: { secret: 'pending-logout' } } },
+                });
+                // A renovação começa com a gravação acima ainda sem commit.
+                extension = extend(row.payload.uid);
+                await setTimeout(500);
+            },
+            { timeout: 5000 },
+        );
+        await extension;
+        assert.deepEqual((await sessionRow(person.sub)).payload.state, {
+            secret: 'pending-logout',
+        });
+    });
+
     it('starts with seven days and a refresh token capped at fourteen', async () => {
         const { person } = await signedIn();
         near(await remaining(person.sub), 7 * day);
@@ -187,6 +263,7 @@ describe('session lifetime', () => {
             const result = await oauth.refresh(tokens.refresh_token);
             assert.equal(result.status, 200, JSON.stringify(result.body));
             near(await remaining(person.sub), expected);
+            near(await refreshRemaining(person.sub), 14 * day - loginAgo);
         });
     }
 

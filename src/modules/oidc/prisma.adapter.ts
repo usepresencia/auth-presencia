@@ -3,8 +3,11 @@ import type { Prisma } from '@prisma/client';
 import { errors, type Adapter, type AdapterPayload } from 'oidc-provider';
 import type { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
 
-/** Modelos cujo id é a própria credencial apresentada pelo client: só o hash é gravado. */
-const SECRET_ID_MODELS = new Set(['AuthorizationCode', 'RefreshToken']);
+/**
+ * Modelos cujo id é uma credencial apresentada pelo client ou pelo navegador: só o hash é
+ * gravado. O id de Interaction fica de fora porque já aparece na URL.
+ */
+const SECRET_ID_MODELS = new Set(['AuthorizationCode', 'RefreshToken', 'Session']);
 /** Modelos que morrem com a concessão. Outros, como Interaction, apenas a referenciam. */
 const GRANTABLE_MODELS = new Set([
     'AccessToken',
@@ -29,7 +32,9 @@ class PrismaAdapter implements Adapter {
 
     async upsert(id: string, payload: AdapterPayload, expiresIn: number): Promise<void> {
         const { jti, ...rest } = payload;
-        const stored = SECRET_ID_MODELS.has(this.model) ? rest : { ...rest, jti };
+        const stored = SECRET_ID_MODELS.has(this.model)
+            ? rest
+            : { ...withoutSessionCookie(rest), jti };
         const data = {
             payload: stored as Prisma.InputJsonObject,
             grantId: GRANTABLE_MODELS.has(this.model) ? (payload.grantId ?? null) : null,
@@ -113,6 +118,14 @@ class PrismaAdapter implements Adapter {
             where: { model: this.model, id: { in: expired.map(row => row.id) } },
         });
     }
+}
+
+/** A interação guarda o id da sessão, que o provedor não relê: não é gravado. */
+function withoutSessionCookie(payload: AdapterPayload): AdapterPayload {
+    const session = payload['session'] as Record<string, unknown> | undefined;
+    if (!session) return payload;
+    const safe = Object.fromEntries(Object.entries(session).filter(([name]) => name !== 'cookie'));
+    return { ...payload, session: safe };
 }
 
 function notExpired(): Prisma.OidcArtifactWhereInput {

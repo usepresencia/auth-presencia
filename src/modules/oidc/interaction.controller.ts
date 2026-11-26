@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
     Controller,
     Get,
@@ -62,6 +63,9 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
 @Controller('interaction/:uid')
 @UseGuards(OriginGuard)
 export class InteractionController {
+    /** Verificações de senha em andamento, por interação e credenciais (só nesta instância). */
+    private readonly signingIn = new Map<string, Promise<string>>();
+
     constructor(
         @Inject(OIDC_PROVIDER) private readonly provider: Provider,
         @Inject(AccountService) private readonly accounts: AccountService,
@@ -91,8 +95,10 @@ export class InteractionController {
         return guarded(async () => {
             const body = parseBody(loginSchema, request);
             // Antes do Firebase: sem interação válida não há tentativa de senha.
-            await this.pending(uid, request, response);
-            const accountId = await this.accounts.signIn(body.email, body.password);
+            const interaction = await this.pending(uid, request, response);
+            // Reenvio de um login já aceito: devolver o mesmo destino, sem testar a senha.
+            if (interaction.result?.login) return { redirectTo: interaction.returnTo };
+            const accountId = await this.signInOnce(uid, body.email, body.password);
             return this.finish(request, response, { login: { accountId, remember: true } });
         });
     }
@@ -122,6 +128,21 @@ export class InteractionController {
             await this.pending(uid, request, response);
             return this.finish(request, response, { error: 'access_denied' });
         });
+    }
+
+    /** Envios idênticos e simultâneos compartilham uma única tentativa no Firebase. */
+    private signInOnce(uid: string, email: string, password: string): Promise<string> {
+        const key = createHash('sha256')
+            .update(JSON.stringify([uid, email, password]))
+            .digest('base64url');
+        let attempt = this.signingIn.get(key);
+        if (!attempt) {
+            attempt = this.accounts
+                .signIn(email, password)
+                .finally(() => this.signingIn.delete(key));
+            this.signingIn.set(key, attempt);
+        }
+        return attempt;
     }
 
     private async pending(uid: string, request: Request, response: Response) {

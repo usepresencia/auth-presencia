@@ -45,6 +45,11 @@ interface ProviderAccount {
     [name: string]: unknown;
 }
 
+/** Conta sem claims para um artefato já consumido; nenhum token é emitido com ela. */
+function replayedAccount(sub: string): ProviderAccount {
+    return { accountId: sub, profile: {}, claims: async () => ({ sub }) };
+}
+
 export function createProvider(
     env: ProviderSettings,
     adapter: (model: string) => Adapter,
@@ -88,6 +93,9 @@ export function createProvider(
             grant_types: ['authorization_code', 'refresh_token'],
             token_endpoint_auth_method: 'client_secret_basic',
         })),
+        // O discovery anuncia só o que a API aceita.
+        responseTypes: ['code'],
+        clientAuthMethods: ['client_secret_basic'],
         jwks: env.AUTH_JWKS as Configuration['jwks'],
         cookies: { keys: env.AUTH_COOKIE_KEYS },
         routes: { authorization: '/authorize' },
@@ -130,6 +138,8 @@ export function createProvider(
         },
         features: {
             devInteractions: { enabled: false },
+            pushedAuthorizationRequests: { enabled: false },
+            dPoP: { enabled: false },
             revocation: { enabled: true },
             // Nenhuma tela é renderizada aqui: o front cuida da confirmação e do sucesso.
             rpInitiatedLogout: {
@@ -179,8 +189,11 @@ export function createProvider(
             const clientId = ctx.oidc.client?.clientId;
             // Sem token (autorização), vale o momento do login da sessão: credenciais
             // revogadas depois dele exigem novo login.
-            const authTime =
-                (token as { authTime?: number } | undefined)?.authTime ?? ctx.oidc.session?.loginTs;
+            const artifact = token as { authTime?: number; consumed?: unknown } | undefined;
+            // Reuso: o provedor só revoga a família depois de carregar a conta, e o pedido
+            // será recusado de qualquer forma. Não depender do Firebase nesse caminho.
+            if (artifact?.consumed) return replayedAccount(sub);
+            const authTime = artifact?.authTime ?? ctx.oidc.session?.loginTs;
             const account = await accounts.load(sub, {
                 firebaseClaims: clientId ? clientConfig(clientId).firebaseClaims : [],
                 authTime,
@@ -212,6 +225,10 @@ export function createProvider(
     provider.use(async (ctx, next) => {
         await next();
         const oidc = (ctx as unknown as { oidc?: OidcRequest }).oidc;
+        // A lista de modos é fixa no provedor; o middleware só deixa passar `query`.
+        if (oidc?.route === 'discovery') {
+            (ctx.body as Record<string, unknown>)['response_modes_supported'] = ['query'];
+        }
         // O provedor responderia um formulário HTML no logout sem sessão e quando outra
         // pessoa entra sobre uma sessão existente: nos dois casos o front confirma.
         const htmlForm =
@@ -237,6 +254,11 @@ export function createProvider(
     // Só o tipo do erro: mensagens do protocolo podem carregar valores sensíveis.
     provider.on('server_error', (_ctx, error) =>
         Logger.error('Falha no provedor OIDC: ' + error.name, 'OidcProvider'),
+    );
+    // Falhas fora das rotas do protocolo: sem este ouvinte, o Koa imprime o stack completo.
+    // A tipagem do provedor não declara o evento herdado do Koa.
+    (provider as unknown as NodeJS.EventEmitter).on('error', (error: Error) =>
+        Logger.error('Falha na requisição OIDC: ' + error.name, 'OidcProvider'),
     );
     return provider;
 }
