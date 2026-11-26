@@ -4,6 +4,7 @@ import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { Test } from '@nestjs/testing';
+import { SignInError } from '../../../dist/modules/accounts/firebase.gateway.js';
 import { Browser } from './browser.mjs';
 import { createTestDatabase } from './database.mjs';
 
@@ -23,6 +24,34 @@ export function fakeGateway() {
     return {
         users,
         down: false,
+        /** Força a falha do próximo login com este código. */
+        failure: undefined,
+        calls: 0,
+        resets: [],
+        passwords: new Map(),
+        addCredentials(uid, email, password) {
+            this.passwords.set(email, { uid, password });
+            return this.add(uid, { email });
+        },
+        async signIn(email, password) {
+            this.calls++;
+            if (this.down || this.failure === 'AUTH_UNAVAILABLE') {
+                throw new Error('firebase unavailable');
+            }
+            if (this.failure) throw new SignInError(this.failure);
+            const known = this.passwords.get(email);
+            if (known?.password !== password) throw new SignInError('INVALID_CREDENTIALS');
+            return {
+                projectId: 'demo-presencia',
+                uid: known.uid,
+                email,
+                emailVerified: true,
+            };
+        },
+        async sendPasswordReset(email) {
+            this.calls++;
+            this.resets.push(email);
+        },
         add(uid, extra = {}) {
             users.set(uid, {
                 uid,

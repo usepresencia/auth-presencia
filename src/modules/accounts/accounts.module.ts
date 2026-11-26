@@ -15,6 +15,7 @@ import { FIREBASE_GATEWAY, type FirebaseGateway } from './firebase.gateway';
             useFactory: (config: ConfigService<Environment, true>) =>
                 new FirebaseAdminGateway({
                     FIREBASE_PROJECT_ID: config.get('FIREBASE_PROJECT_ID', { infer: true }),
+                    FIREBASE_API_KEY: config.get('FIREBASE_API_KEY', { infer: true }),
                     FIREBASE_CLIENT_EMAIL: config.get('FIREBASE_CLIENT_EMAIL', { infer: true }),
                     FIREBASE_PRIVATE_KEY: config.get('FIREBASE_PRIVATE_KEY', { infer: true }),
                     FIREBASE_AUTH_EMULATOR_HOST: config.get('FIREBASE_AUTH_EMULATOR_HOST', {
