@@ -1,32 +1,51 @@
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
+  provider = "postgresql"
 }
 
 /// Identidade estável do auth; `id` é o `sub` dos tokens.
 model Identity {
-    id            String             @id @db.Uuid
-    status        String             @default("active")
-    email         String?
-    emailVerified Boolean            @default(false) @map("email_verified")
-    createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-    firebaseLinks FirebaseIdentity[]
+  id            String             @id @db.Uuid
+  status        String             @default("active")
+  email         String?
+  emailVerified Boolean            @default(false) @map("email_verified")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  firebaseLinks FirebaseIdentity[]
 
-    @@map("auth_identities")
+  @@map("auth_identities")
 }
 
 /// Vínculo externo: projeto Firebase + UID.
 model FirebaseIdentity {
-    firebaseProjectId String   @map("firebase_project_id")
-    firebaseUid       String   @map("firebase_uid")
-    identityId        String   @map("identity_id") @db.Uuid
-    createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-    identity          Identity @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  firebaseProjectId String   @map("firebase_project_id")
+  firebaseUid       String   @map("firebase_uid")
+  identityId        String   @map("identity_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  identity          Identity @relation(fields: [identityId], references: [id], onDelete: Restrict)
 
-    @@id([firebaseProjectId, firebaseUid])
-    @@index([identityId], map: "auth_firebase_identities_identity_idx")
-    @@map("auth_firebase_identities")
+  @@id([firebaseProjectId, firebaseUid])
+  @@index([identityId], map: "auth_firebase_identities_identity_idx")
+  @@map("auth_firebase_identities")
+}
+
+/// Artefatos do protocolo (oidc-provider): sessões, códigos, tokens e concessões.
+model OidcArtifact {
+  model      String
+  id         String
+  payload    Json
+  grantId    String?   @map("grant_id")
+  uid        String?
+  userCode   String?   @map("user_code")
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+
+  @@id([model, id])
+  @@index([grantId])
+  @@index([uid])
+  @@index([userCode])
+  @@index([model, expiresAt])
+  @@map("auth_oidc_artifacts")
 }
