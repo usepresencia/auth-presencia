@@ -15,6 +15,7 @@ nvm use
 npm ci
 cp .env.example .env    # preencha as chaves (veja abaixo)
 docker compose up -d db
+npm run emulators         # Firebase Auth Emulator, em outro terminal
 npm run prisma:generate
 npm run db:migrate
 npm run start:dev
@@ -26,7 +27,7 @@ O serviço escuta em http://localhost:3340 por padrão. AUTH_ISSUER deve represe
 
 - GET /health/live: 200 quando o processo HTTP responde.
 - GET /health/ready: 503 enquanto provedor e persistência não estiverem implementados; não utilizar como readiness de uma implantação funcional ainda.
-- Endpoints OIDC e de gestão ainda não estão publicados.
+- Protocolo OIDC publicado: discovery em /.well-known/openid-configuration, /jwks, /authorize, /token e /me. As rotas de login para o front, o logout e os endpoints de gestão ainda não estão publicados.
 
 ## Estrutura
 
