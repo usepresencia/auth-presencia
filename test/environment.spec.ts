@@ -90,6 +90,13 @@ describe('environment validation', () => {
         expect(message).not.toContain('sensitive');
     });
 
+    it('rejects the Firestore emulator in production', () =>
+        rejects(
+            { FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080' },
+            'FIRESTORE_EMULATOR_HOST',
+            production,
+        ));
+
     it('accepts the emulator host outside production', () => {
         expect(
             validateEnvironment({ ...valid, FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099' })

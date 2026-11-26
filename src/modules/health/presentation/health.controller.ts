@@ -1,4 +1,5 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
+import { AppError } from '../../errors/model/app.error';
 
 @Controller('health')
 export class HealthController {
@@ -9,9 +10,6 @@ export class HealthController {
 
     @Get('ready')
     ready(): never {
-        throw new ServiceUnavailableException({
-            status: 'not_ready',
-            reason: 'OIDC provider and persistence are not configured yet.',
-        });
+        throw new AppError('NOT_READY');
     }
 }

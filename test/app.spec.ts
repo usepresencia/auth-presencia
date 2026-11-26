@@ -32,9 +32,32 @@ describe('application foundation', () => {
         expect(response.body).toEqual({ status: 'ok', service: 'auth-presencia' });
     });
 
-    it('does not advertise readiness before OIDC and persistence exist', async () => {
+    it('reports that the service is not ready yet', async () => {
         const response = await request(app.getHttpServer()).get('/health/ready').expect(503);
-        expect(response.body.status).toBe('not_ready');
+        expect(response.body).toMatchObject({ statusCode: 503, code: 'NOT_READY' });
+    });
+
+    it('answers errors in the standard format with a correlation id', async () => {
+        const response = await request(app.getHttpServer()).get('/unknown').expect(404);
+        const correlationId = response.headers['x-correlation-id'];
+        expect(correlationId).toMatch(/^[A-Za-z0-9_-]{8,128}$/);
+        expect(response.body).toEqual({
+            statusCode: 404,
+            code: 'NOT_FOUND',
+            message: 'Recurso não encontrado.',
+            error: 'Not Found',
+            correlationId,
+        });
+    });
+
+    it.each([
+        ['reuses a safe incoming correlation id', 'client-id-0001', true],
+        ['replaces an unsafe correlation id', '../../etc', false],
+    ])('%s', async (_name, incoming, kept) => {
+        const response = await request(app.getHttpServer())
+            .get('/unknown')
+            .set('x-correlation-id', incoming);
+        expect(response.headers['x-correlation-id'] === incoming).toBe(kept);
     });
 
     it('publishes the discovery document', async () => {

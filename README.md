@@ -37,6 +37,10 @@ A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias
 
 **Ainda não publicar em produção:** não há limite de tentativas de login nem readiness (#15).
 
+## Erros
+
+Rotas próprias respondem `statusCode`, `code`, `message`, `error` e `correlationId`; as rotas do protocolo seguem o formato do OAuth. Falhas 5xx são gravadas em `logs/{correlationId}/entries` no Firestore, lidas pela tela de Logs do web-admin-console, sem a mensagem original do erro. O header `x-correlation-id` é aceito e devolvido.
+
 ## Estrutura
 
 ```text

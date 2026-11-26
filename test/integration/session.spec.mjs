@@ -342,7 +342,7 @@ describe('logout through the front', () => {
         await endSession(browser, bye());
         const response = await details(new Browser());
         assert.equal(response.status, 410);
-        assert.deepEqual(await response.json(), { code: 'LOGOUT_EXPIRED' });
+        assert.equal((await response.json()).code, 'LOGOUT_EXPIRED');
     });
 
     it('answers LOGOUT_EXPIRED when no logout was started', async () => {

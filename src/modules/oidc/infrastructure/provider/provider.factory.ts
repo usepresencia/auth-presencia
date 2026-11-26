@@ -1,6 +1,7 @@
 import Provider, { errors, type Adapter, type Configuration } from 'oidc-provider';
 import type { Environment } from '../../../../shared/config/environment';
 import type { AccountService } from '../../../accounts/application/account.service';
+import type { ErrorReport } from '../../../errors/model/error-log';
 import { TTL } from '../../model/session-policy';
 import { accountSupport } from './accounts';
 import { clientRegistry } from './client-registry';
@@ -20,12 +21,14 @@ export type ProviderSettings = Pick<
  * erros são entregues ao front por redirecionamento.
  *
  * @param extendSession renova a sessão após o uso de um refresh token.
+ * @param reportError recebe as falhas internas das rotas do protocolo.
  */
 export function createProvider(
     env: ProviderSettings,
     adapter: (model: string) => Adapter,
     accounts: AccountService,
     extendSession: (uid: string) => Promise<void>,
+    reportError: (report: ErrorReport) => void,
 ): Provider {
     const clientConfig = clientRegistry(env.AUTH_CLIENTS);
 
@@ -97,6 +100,6 @@ export function createProvider(
 
     const provider = new Provider(env.AUTH_ISSUER, configuration);
     provider.proxy = env.AUTH_TRUST_PROXY;
-    registerHooks(provider, extendSession);
+    registerHooks(provider, extendSession, reportError);
     return provider;
 }

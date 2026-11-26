@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import type { OnModuleDestroy } from '@nestjs/common';
-import { applicationDefault, cert, deleteApp, initializeApp, type App } from 'firebase-admin/app';
+import { deleteApp, type App } from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
+import { createFirebaseApp } from '../../firebase/infrastructure/firebase-app';
 import type { Environment } from '../../../shared/config/environment';
 import type { VerifiedFirebaseIdentity } from '../../identity/model/identity';
 import { SignInError, type SignInFailure } from '../model/sign-in.error';
@@ -64,17 +64,7 @@ export class FirebaseAdminGateway implements FirebaseGateway, OnModuleDestroy {
         this.toolkitUrl = emulator
             ? `http://${emulator}/identitytoolkit.googleapis.com/v1`
             : 'https://identitytoolkit.googleapis.com/v1';
-        const clientEmail = settings.FIREBASE_CLIENT_EMAIL;
-        const privateKey = settings.FIREBASE_PRIVATE_KEY?.replaceAll('\\n', '\n');
-        const credential = emulator
-            ? undefined
-            : clientEmail && privateKey
-              ? cert({ projectId, clientEmail, privateKey })
-              : applicationDefault();
-        this.app = initializeApp(
-            { projectId, ...(credential ? { credential } : {}) },
-            'auth-presencia-' + randomUUID(),
-        );
+        this.app = createFirebaseApp(settings, Boolean(emulator));
         this.auth = getAuth(this.app);
     }
 
