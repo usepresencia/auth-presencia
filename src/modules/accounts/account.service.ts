@@ -1,5 +1,6 @@
 import type { IdentityService } from '../identity/application/identity.service';
-import type { FirebaseGateway } from './firebase.gateway';
+import { IdentityDisabledError } from '../identity/domain/identity';
+import { SignInError, type FirebaseGateway } from './firebase.gateway';
 
 export interface Account {
     sub: string;
@@ -16,10 +17,30 @@ export interface LoadOptions {
 /** Monta a conta usada nos tokens. Não decide acesso a produto. */
 export class AccountService {
     constructor(
-        private readonly identities: Pick<IdentityService, 'findActiveById'>,
+        private readonly identities: Pick<
+            IdentityService,
+            'findActiveById' | 'resolveVerifiedFirebaseIdentity'
+        >,
         private readonly firebase: FirebaseGateway,
         private readonly projectId: string,
     ) {}
+
+    /** Autentica por e-mail e senha e devolve o `sub` estável. */
+    async signIn(email: string, password: string): Promise<string> {
+        const principal = await this.firebase.signIn(email, password);
+        try {
+            return (await this.identities.resolveVerifiedFirebaseIdentity(principal)).id;
+        } catch (error) {
+            if (error instanceof IdentityDisabledError) {
+                throw new SignInError('ACCOUNT_DISABLED');
+            }
+            throw error;
+        }
+    }
+
+    async sendPasswordReset(email: string): Promise<void> {
+        await this.firebase.sendPasswordReset(email);
+    }
 
     async load(sub: string, options: LoadOptions): Promise<Account | null> {
         const identity = await this.identities.findActiveById(sub);

@@ -5,13 +5,16 @@ import { PrismaModule } from '../../shared/infrastructure/persistence/prisma.mod
 import { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
 import { AccountService } from '../accounts/account.service';
 import { AccountsModule } from '../accounts/accounts.module';
+import { InteractionController } from './interaction.controller';
+import { OIDC_PROVIDER } from './oidc.tokens';
 import { createPrismaAdapter } from './prisma.adapter';
 import { createProvider } from './provider.factory';
 
-export const OIDC_PROVIDER = Symbol.for('auth-presencia.oidc-provider');
+export { OIDC_PROVIDER };
 
 @Module({
     imports: [PrismaModule, AccountsModule],
+    controllers: [InteractionController],
     providers: [
         {
             provide: OIDC_PROVIDER,
