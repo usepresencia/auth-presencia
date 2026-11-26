@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, HttpException, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
-import type { Environment } from '../../shared/config/environment';
+import type { Environment } from '../../../shared/config/environment';
 
 @Injectable()
 export class OriginGuard implements CanActivate {

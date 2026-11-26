@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
-import { FirebaseAdminGateway } from '../../dist/modules/accounts/firebase-admin.gateway.js';
+import { FirebaseAdminGateway } from '../../dist/modules/accounts/infrastructure/firebase-admin.gateway.js';
 import { firebaseFixtures, projectId } from './support/firebase.mjs';
 
 let fixtures;

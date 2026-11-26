@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Identity as IdentityRow } from '@prisma/client';
-import type { PrismaService } from '../../../shared/infrastructure/persistence/prisma.service';
-import type {
-    Identity,
-    IdentityRepository,
-    LinkedIdentity,
-    VerifiedFirebaseIdentity,
-} from '../domain/identity';
+import type { PrismaService } from '../../persistence/infrastructure/prisma.service';
+import type { Identity, LinkedIdentity, VerifiedFirebaseIdentity } from '../model/identity';
+import type { IdentityRepository } from '../model/identity.repository';
 
 function mapIdentity(row: IdentityRow): Identity {
     return {

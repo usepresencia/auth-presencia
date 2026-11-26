@@ -17,15 +17,3 @@ export interface LinkedIdentity extends Identity {
     projectId: string;
     uid: string;
 }
-
-export interface IdentityRepository {
-    findById(id: string): Promise<LinkedIdentity | null>;
-    findOrCreate(principal: VerifiedFirebaseIdentity): Promise<Identity>;
-}
-
-export class IdentityDisabledError extends Error {
-    constructor() {
-        super('Identity is disabled.');
-        this.name = 'IdentityDisabledError';
-    }
-}

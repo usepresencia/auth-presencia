@@ -4,9 +4,9 @@ import type { Environment } from '../../shared/config/environment';
 import { pickConfig } from '../../shared/config/pick-config';
 import { IdentityService } from '../identity/application/identity.service';
 import { IdentityModule } from '../identity/identity.module';
-import { AccountService } from './account.service';
-import { FirebaseAdminGateway } from './firebase-admin.gateway';
-import { FIREBASE_GATEWAY, type FirebaseGateway } from './firebase.gateway';
+import { AccountService } from './application/account.service';
+import { FirebaseAdminGateway } from './infrastructure/firebase-admin.gateway';
+import { FIREBASE_GATEWAY, type FirebaseGateway } from './model/firebase.gateway';
 
 @Module({
     imports: [IdentityModule],

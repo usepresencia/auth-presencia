@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
-import { createPrismaAdapter } from '../../dist/modules/oidc/prisma.adapter.js';
+import { createPrismaAdapter } from '../../dist/modules/oidc/infrastructure/prisma-oidc.adapter.js';
 import { createTestDatabase } from './support/database.mjs';
 
 let database;

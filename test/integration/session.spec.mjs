@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
-import { createSessionExtension } from '../../dist/modules/oidc/session-extension.js';
+import { createSessionExtension } from '../../dist/modules/oidc/infrastructure/prisma-session.extension.js';
 import { jwtClaims as claims } from '../support/fixtures.mjs';
 import { buildTestApp, oauthClient } from './support/app.mjs';
 import { Browser } from './support/browser.mjs';

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
     Controller,
     Get,
@@ -15,15 +14,12 @@ import {
 import type { Request, Response } from 'express';
 import Provider, { errors, type InteractionResults } from 'oidc-provider';
 import { z } from 'zod';
-import { errorName } from '../../shared/utils/error-name';
-import { AccountService } from '../accounts/account.service';
-import { SignInError, type SignInFailure } from '../accounts/firebase.gateway';
-import { OIDC_PROVIDER } from './oidc.tokens';
+import { errorName } from '../../../shared/utils/error-name';
+import { LoginService } from '../application/login.service';
+import { SignInError, type SignInFailure } from '../../accounts/model/sign-in.error';
+import { OIDC_PROVIDER } from '../oidc.tokens';
+import { loginSchema, passwordResetSchema } from './interaction.schemas';
 import { OriginGuard } from './origin.guard';
-
-const email = z.email().max(320);
-const loginSchema = z.strictObject({ email, password: z.string().min(1).max(1024) });
-const resetSchema = z.strictObject({ email });
 
 const FAILURE_STATUS: Record<SignInFailure, number> = {
     INVALID_CREDENTIALS: 401,
@@ -55,11 +51,9 @@ async function guarded<T>(operation: () => Promise<T>): Promise<T> {
 @Controller('interaction/:uid')
 @UseGuards(OriginGuard)
 export class InteractionController {
-    private readonly signingIn = new Map<string, Promise<string>>();
-
     constructor(
         @Inject(OIDC_PROVIDER) private readonly provider: Provider,
-        @Inject(AccountService) private readonly accounts: AccountService,
+        @Inject(LoginService) private readonly logins: LoginService,
     ) {}
 
     @Get('details')
@@ -87,7 +81,7 @@ export class InteractionController {
             const body = parseBody(loginSchema, request);
             const interaction = await this.pending(uid, request, response);
             if (interaction.result?.login) return { redirectTo: interaction.returnTo };
-            const accountId = await this.signInOnce(uid, body.email, body.password);
+            const accountId = await this.logins.signIn(uid, body.email, body.password);
             return this.finish(request, response, { login: { accountId, remember: true } });
         });
     }
@@ -100,9 +94,9 @@ export class InteractionController {
         @Res({ passthrough: true }) response: Response,
     ): Promise<void> {
         return guarded(async () => {
-            const body = parseBody(resetSchema, request);
+            const body = parseBody(passwordResetSchema, request);
             await this.pending(uid, request, response);
-            await this.accounts.sendPasswordReset(body.email);
+            await this.logins.sendPasswordReset(body.email);
         });
     }
 
@@ -117,24 +111,6 @@ export class InteractionController {
             await this.pending(uid, request, response);
             return this.finish(request, response, { error: 'access_denied' });
         });
-    }
-
-    /**
-     * Autentica compartilhando uma única tentativa entre envios idênticos e simultâneos da
-     * mesma interação, nesta instância.
-     */
-    private signInOnce(uid: string, email: string, password: string): Promise<string> {
-        const key = createHash('sha256')
-            .update(JSON.stringify([uid, email, password]))
-            .digest('base64url');
-        let attempt = this.signingIn.get(key);
-        if (!attempt) {
-            attempt = this.accounts
-                .signIn(email, password)
-                .finally(() => this.signingIn.delete(key));
-            this.signingIn.set(key, attempt);
-        }
-        return attempt;
     }
 
     private async pending(uid: string, request: Request, response: Response) {

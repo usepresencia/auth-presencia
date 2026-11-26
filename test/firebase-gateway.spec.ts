@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FirebaseAdminGateway } from '../src/modules/accounts/firebase-admin.gateway';
-import { SignInError } from '../src/modules/accounts/firebase.gateway';
+import { FirebaseAdminGateway } from '../src/modules/accounts/infrastructure/firebase-admin.gateway';
+import { SignInError } from '../src/modules/accounts/model/sign-in.error';
 
 const password = 'fixture-password-sensitive';
 const apiKey = 'fixture-api-key-sensitive';

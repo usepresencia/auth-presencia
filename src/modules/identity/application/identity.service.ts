@@ -1,11 +1,11 @@
 import { z } from 'zod';
+import { IdentityDisabledError } from '../model/identity.errors';
 import {
-    IdentityDisabledError,
     type Identity,
-    type IdentityRepository,
     type LinkedIdentity,
     type VerifiedFirebaseIdentity,
-} from '../domain/identity';
+} from '../model/identity';
+import { type IdentityRepository } from '../model/identity.repository';
 
 const principalSchema = z
     .object({
@@ -24,7 +24,7 @@ const principalSchema = z
                         character =>
                             character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127,
                     ),
-                'UID contains control characters.',
+                'UID contém caracteres de controle.',
             ),
         email: z.email().max(320).optional(),
         emailVerified: z.boolean(),

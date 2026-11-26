@@ -2,14 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { OnModuleDestroy } from '@nestjs/common';
 import { applicationDefault, cert, deleteApp, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth, type Auth } from 'firebase-admin/auth';
-import type { Environment } from '../../shared/config/environment';
-import type { VerifiedFirebaseIdentity } from '../identity/domain/identity';
-import {
-    SignInError,
-    type FirebaseGateway,
-    type FirebaseUser,
-    type SignInFailure,
-} from './firebase.gateway';
+import type { Environment } from '../../../shared/config/environment';
+import type { VerifiedFirebaseIdentity } from '../../identity/model/identity';
+import { SignInError, type SignInFailure } from '../model/sign-in.error';
+import { type FirebaseGateway, type FirebaseUser } from '../model/firebase.gateway';
 
 export type FirebaseSettings = Pick<
     Environment,
@@ -154,16 +150,18 @@ export class FirebaseAdminGateway implements FirebaseGateway, OnModuleDestroy {
                 },
             );
             const body = (await response.json()) as ToolkitResponse;
-            if (!response.ok && !body.error) throw new Error('unexpected status');
+            if (!response.ok && !body.error) throw new Error('status inesperado');
             return body;
         } catch {
-            throw new Error('Firebase Identity Toolkit unavailable.');
+            throw new Error('Firebase Identity Toolkit indisponível.');
         }
     }
 
     private failure(body: ToolkitResponse): Error {
         const code = SIGN_IN_FAILURES[errorCode(body)];
-        return code ? new SignInError(code) : new Error('Firebase Identity Toolkit rejected.');
+        return code
+            ? new SignInError(code)
+            : new Error('Firebase Identity Toolkit recusou o pedido.');
     }
 
     async onModuleDestroy(): Promise<void> {

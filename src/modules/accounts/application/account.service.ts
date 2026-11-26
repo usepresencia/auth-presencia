@@ -1,16 +1,8 @@
-import type { IdentityService } from '../identity/application/identity.service';
-import { IdentityDisabledError } from '../identity/domain/identity';
-import { SignInError, type FirebaseGateway } from './firebase.gateway';
-
-export interface Account {
-    sub: string;
-    claims: Record<string, unknown>;
-}
-
-export interface LoadOptions {
-    firebaseClaims: string[];
-    authTime?: number;
-}
+import type { Account, LoadOptions } from '../model/account';
+import type { IdentityService } from '../../identity/application/identity.service';
+import { IdentityDisabledError } from '../../identity/model/identity.errors';
+import { SignInError } from '../model/sign-in.error';
+import { type FirebaseGateway } from '../model/firebase.gateway';
 
 export class AccountService {
     constructor(
@@ -51,7 +43,7 @@ export class AccountService {
         if (!user || user.disabled) return null;
         if (options.authTime !== undefined && user.validSince > options.authTime) return null;
 
-        const custom = options.firebaseClaims.flatMap(name =>
+        const custom = options.firebaseClaims.flatMap((name): [string, unknown][] =>
             Object.hasOwn(user.customClaims, name) ? [[name, user.customClaims[name]]] : [],
         );
         const standard = {

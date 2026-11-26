@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import { FirebaseAdminGateway } from '../../dist/modules/accounts/firebase-admin.gateway.js';
+import { FirebaseAdminGateway } from '../../dist/modules/accounts/infrastructure/firebase-admin.gateway.js';
 import { emulatorHost, firebaseFixtures, password, projectId } from './support/firebase.mjs';
 
 const host = emulatorHost();

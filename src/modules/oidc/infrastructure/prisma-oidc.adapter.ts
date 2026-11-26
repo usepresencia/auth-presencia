@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { errors, type Adapter, type AdapterPayload } from 'oidc-provider';
-import type { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
+import type { PrismaService } from '../../persistence/infrastructure/prisma.service';
 
 const SECRET_ID_MODELS = new Set(['AuthorizationCode', 'RefreshToken', 'Session']);
 const GRANTABLE_MODELS = new Set([

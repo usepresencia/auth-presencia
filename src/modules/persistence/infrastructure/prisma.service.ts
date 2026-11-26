@@ -1,14 +1,13 @@
-import { Injectable, type OnModuleDestroy } from '@nestjs/common';
+import type { OnModuleDestroy } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import type { Environment } from '../../config/environment';
+import type { Environment } from '../../../shared/config/environment';
 
-@Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
     constructor(config: ConfigService<Environment, true>) {
         const url = config.get('DATABASE_URL', { infer: true });
-        if (!url) throw new Error('DATABASE_URL is required');
+        if (!url) throw new Error('DATABASE_URL é obrigatória.');
         super({
             adapter: new PrismaPg(
                 {

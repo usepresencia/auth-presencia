@@ -72,7 +72,7 @@ const environmentSchema = z
             .url()
             .refine(
                 value => ['postgres:', 'postgresql:'].includes(new URL(value).protocol),
-                'DATABASE_URL must use PostgreSQL.',
+                'DATABASE_URL deve usar PostgreSQL.',
             ),
         AUTH_JWKS: json(z.object({ keys: z.array(signingKeySchema).min(1) })),
         AUTH_COOKIE_KEYS: z

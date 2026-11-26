@@ -1,4 +1,4 @@
-import type { VerifiedFirebaseIdentity } from '../identity/domain/identity';
+import type { VerifiedFirebaseIdentity } from '../../identity/model/identity';
 
 export const FIREBASE_GATEWAY = Symbol.for('auth-presencia.firebase-gateway');
 
@@ -10,16 +10,6 @@ export interface FirebaseUser {
     disabled: boolean;
     validSince: number;
     customClaims: Record<string, unknown>;
-}
-
-export type SignInFailure =
-    'INVALID_CREDENTIALS' | 'ACCOUNT_DISABLED' | 'TOO_MANY_ATTEMPTS' | 'MFA_UNSUPPORTED';
-
-export class SignInError extends Error {
-    constructor(readonly code: SignInFailure) {
-        super(code);
-        this.name = 'SignInError';
-    }
 }
 
 export interface FirebaseGateway {

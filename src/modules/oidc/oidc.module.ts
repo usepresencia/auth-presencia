@@ -2,23 +2,27 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Environment } from '../../shared/config/environment';
 import { pickConfig } from '../../shared/config/pick-config';
-import { PrismaModule } from '../../shared/infrastructure/persistence/prisma.module';
-import { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
-import { AccountService } from '../accounts/account.service';
+import { PersistenceModule } from '../persistence/persistence.module';
+import { PrismaService } from '../persistence/infrastructure/prisma.service';
+import { AccountService } from '../accounts/application/account.service';
 import { AccountsModule } from '../accounts/accounts.module';
-import { InteractionController } from './interaction.controller';
+import { InteractionController } from './presentation/interaction.controller';
 import { OIDC_PROVIDER } from './oidc.tokens';
-import { createPrismaAdapter } from './prisma.adapter';
-import { LogoutController } from './logout.controller';
-import { createProvider } from './provider.factory';
-import { createSessionExtension } from './session-extension';
-
-export { OIDC_PROVIDER };
+import { LoginService } from './application/login.service';
+import { createPrismaAdapter } from './infrastructure/prisma-oidc.adapter';
+import { LogoutController } from './presentation/logout.controller';
+import { createProvider } from './infrastructure/provider/provider.factory';
+import { createSessionExtension } from './infrastructure/prisma-session.extension';
 
 @Module({
-    imports: [PrismaModule, AccountsModule],
+    imports: [PersistenceModule, AccountsModule],
     controllers: [InteractionController, LogoutController],
     providers: [
+        {
+            provide: LoginService,
+            useFactory: (accounts: AccountService) => new LoginService(accounts),
+            inject: [AccountService],
+        },
         {
             provide: OIDC_PROVIDER,
             useFactory: (

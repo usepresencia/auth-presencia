@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
-import type { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
-import { epochSeconds, sessionTtl } from './session-policy';
+import type { PrismaService } from '../../persistence/infrastructure/prisma.service';
+import { epochSeconds, sessionTtl } from '../model/session-policy';
 
 const ATTEMPTS = 3;
 

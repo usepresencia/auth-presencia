@@ -44,8 +44,15 @@ src/
   main.ts, app.module.ts, bootstrap.ts
   shared/       # somente o que mais de uma camada usa
   modules/      # um diretório por módulo, com as camadas que ele usa
+    <módulo>/
+      model/            # entidades, regras puras, interfaces e erros
+      application/      # casos de uso
+      infrastructure/   # Prisma, Firebase e oidc-provider
+      presentation/     # controllers, guards, middleware e validação de entrada
 test/           # unidade, integração e workflows
 ```
+
+A direção das dependências entre camadas é verificada pelo `npm run lint`.
 
 ## Verificação
 

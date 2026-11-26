@@ -1,7 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { json, type NextFunction, type Request, type Response } from 'express';
-import { OIDC_PROVIDER } from './modules/oidc/oidc.module';
-import { oidcMiddleware } from './modules/oidc/provider.middleware';
+import { OIDC_PROVIDER } from './modules/oidc/oidc.tokens';
+import { oidcMiddleware } from './modules/oidc/presentation/provider.middleware';
 
 export function configureApp(app: NestExpressApplication): void {
     app.disable('x-powered-by');

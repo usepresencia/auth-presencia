@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { Test } from '@nestjs/testing';
-import { SignInError } from '../../../dist/modules/accounts/firebase.gateway.js';
+import { SignInError } from '../../../dist/modules/accounts/model/sign-in.error.js';
 import { kontalClient, secret, signingKey } from '../../support/fixtures.mjs';
 import { Browser } from './browser.mjs';
 import { createTestDatabase } from './database.mjs';
@@ -87,8 +87,8 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
     const dist = '../../../dist/';
     const { AppModule } = await import(dist + 'app.module.js');
     const { configureApp } = await import(dist + 'bootstrap.js');
-    const { FIREBASE_GATEWAY } = await import(dist + 'modules/accounts/firebase.gateway.js');
-    const { OIDC_PROVIDER } = await import(dist + 'modules/oidc/oidc.module.js');
+    const { FIREBASE_GATEWAY } = await import(dist + 'modules/accounts/model/firebase.gateway.js');
+    const { OIDC_PROVIDER } = await import(dist + 'modules/oidc/oidc.tokens.js');
     const { IdentityService } = await import(
         dist + 'modules/identity/application/identity.service.js'
     );
