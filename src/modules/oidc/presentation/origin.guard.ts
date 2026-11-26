@@ -1,6 +1,7 @@
-import { CanActivate, ExecutionContext, HttpException, Inject, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
+import { AppError } from '../../errors/model/app.error';
 import type { Environment } from '../../../shared/config/environment';
 
 @Injectable()
@@ -15,7 +16,7 @@ export class OriginGuard implements CanActivate {
         const request = context.switchToHttp().getRequest<Request>();
         if (request.method === 'GET' || request.method === 'HEAD') return true;
         if (request.headers.origin !== this.origin) {
-            throw new HttpException({ code: 'ORIGIN_NOT_ALLOWED' }, 403);
+            throw new AppError('ORIGIN_NOT_ALLOWED');
         }
         return true;
     }

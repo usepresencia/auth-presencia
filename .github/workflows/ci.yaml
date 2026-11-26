@@ -50,7 +50,7 @@ jobs:
             - run: npm run test:coverage
             - run: npm run test:poc
             - run: npm run build
-            - run: npx --no-install firebase emulators:exec --only auth --project demo-presencia 'npm run test:integration'
+            - run: npx --no-install firebase emulators:exec --only auth,firestore --project demo-presencia 'npm run test:integration'
               env:
                   INTEGRATION_DATABASE_URL: postgresql://auth_test:local-fixture-only@127.0.0.1:5432/presencia_auth_test
             - run: npm run docs

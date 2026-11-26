@@ -28,7 +28,7 @@
         "test:poc": "node --test poc/oidc-provider.spec.mjs",
         "prisma:generate": "prisma generate",
         "prisma:migrate": "prisma migrate dev",
-        "emulators": "firebase emulators:start --only auth --project demo-presencia"
+        "emulators": "firebase emulators:start --only auth,firestore --project demo-presencia"
     },
     "dependencies": {
         "@nestjs/common": "^12.3.2",

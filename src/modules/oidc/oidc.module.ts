@@ -8,6 +8,8 @@ import { AccountService } from '../accounts/application/account.service';
 import { AccountsModule } from '../accounts/accounts.module';
 import { InteractionController } from './presentation/interaction.controller';
 import { OIDC_PROVIDER } from './oidc.tokens';
+import { RecordErrorService } from '../errors/application/record-error.service';
+import { ErrorsModule } from '../errors/errors.module';
 import { LoginService } from './application/login.service';
 import { createPrismaAdapter } from './infrastructure/prisma-oidc.adapter';
 import { LogoutController } from './presentation/logout.controller';
@@ -15,7 +17,7 @@ import { createProvider } from './infrastructure/provider/provider.factory';
 import { createSessionExtension } from './infrastructure/prisma-session.extension';
 
 @Module({
-    imports: [PersistenceModule, AccountsModule],
+    imports: [PersistenceModule, AccountsModule, ErrorsModule],
     controllers: [InteractionController, LogoutController],
     providers: [
         {
@@ -29,6 +31,7 @@ import { createSessionExtension } from './infrastructure/prisma-session.extensio
                 config: ConfigService<Environment, true>,
                 prisma: PrismaService,
                 accounts: AccountService,
+                errors: RecordErrorService,
             ) =>
                 createProvider(
                     pickConfig(
@@ -42,8 +45,9 @@ import { createSessionExtension } from './infrastructure/prisma-session.extensio
                     createPrismaAdapter(prisma),
                     accounts,
                     createSessionExtension(prisma),
+                    report => void errors.record({ ...report, code: 'INTERNAL_ERROR' }),
                 ),
-            inject: [ConfigService, PrismaService, AccountService],
+            inject: [ConfigService, PrismaService, AccountService, RecordErrorService],
         },
     ],
     exports: [OIDC_PROVIDER],

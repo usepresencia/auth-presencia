@@ -1,6 +1,7 @@
-import { Controller, Get, Header, HttpException, Inject, Req, Res } from '@nestjs/common';
+import { Controller, Get, Header, Inject, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type Provider from 'oidc-provider';
+import { AppError } from '../../errors/model/app.error';
 import { OIDC_PROVIDER } from '../oidc.tokens';
 
 interface LogoutSession {
@@ -17,7 +18,7 @@ export class LogoutController {
         const context = this.provider.createContext(request, response);
         const session = (await this.provider.Session.get(context)) as LogoutSession;
         if (!session.state?.secret) {
-            throw new HttpException({ code: 'LOGOUT_EXPIRED' }, 410);
+            throw new AppError('LOGOUT_EXPIRED');
         }
         return {
             clientId: session.state.clientId,

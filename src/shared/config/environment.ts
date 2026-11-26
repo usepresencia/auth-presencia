@@ -39,6 +39,11 @@ function json<T extends z.ZodType>(schema: T) {
         .pipe(schema);
 }
 
+const emulatorHost = z
+    .string()
+    .regex(/^[a-zA-Z0-9.-]+:\d{1,5}$/, 'Use host:porta, sem esquema ou caminho.')
+    .optional();
+
 const signingKeySchema = z.looseObject({
     kty: z.literal('RSA'),
     kid: z.string().min(1),
@@ -96,10 +101,8 @@ const environmentSchema = z
         FIREBASE_API_KEY: z.string().min(1),
         FIREBASE_CLIENT_EMAIL: z.email().optional(),
         FIREBASE_PRIVATE_KEY: z.string().min(1).optional(),
-        FIREBASE_AUTH_EMULATOR_HOST: z
-            .string()
-            .regex(/^[a-zA-Z0-9.-]+:\d{1,5}$/, 'Use host:porta, sem esquema ou caminho.')
-            .optional(),
+        FIREBASE_AUTH_EMULATOR_HOST: emulatorHost,
+        FIRESTORE_EMULATOR_HOST: emulatorHost,
     })
     .superRefine((env, ctx) => {
         if (env.NODE_ENV !== 'production') return;
@@ -113,6 +116,11 @@ const environmentSchema = z
             [
                 'FIREBASE_AUTH_EMULATOR_HOST',
                 !env.FIREBASE_AUTH_EMULATOR_HOST,
+                'Emulador proibido em produção.',
+            ],
+            [
+                'FIRESTORE_EMULATOR_HOST',
+                !env.FIRESTORE_EMULATOR_HOST,
                 'Emulador proibido em produção.',
             ],
             [

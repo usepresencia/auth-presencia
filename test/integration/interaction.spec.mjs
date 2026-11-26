@@ -36,7 +36,11 @@ function post(flow, action, body, { origin = env.issuer, contentType } = {}) {
 const credentials = { email: 'login@example.test', password: 'right-password' };
 const expectCode = async (response, status, code) => {
     assert.equal(response.status, status);
-    assert.deepEqual(await response.json(), { code });
+    const body = await response.json();
+    assert.equal(body.code, code);
+    assert.equal(body.statusCode, status);
+    assert.equal(body.correlationId, response.headers.get('x-correlation-id'));
+    assert.ok(body.message.length > 0);
     assert.equal(response.headers.get('cache-control'), 'no-store');
 };
 
