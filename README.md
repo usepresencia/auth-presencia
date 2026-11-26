@@ -70,7 +70,7 @@ docker build -t auth-presencia .
 docker run --rm -p 3340:3340 --env-file .env.container auth-presencia
 ```
 
-O arquivo .env.container (não versionado) precisa das mesmas variáveis do .env.example, com valores de produção e sem aspas. Esse comando testa apenas a base HTTP. Não configura DNS, TLS ou um provedor OIDC. O container usa Node 24 e usuário sem privilégios. Quando persistência for implementada, o health de readiness deverá verificar suas dependências reais.
+O arquivo .env.container (não versionado) precisa das mesmas variáveis do .env.example, com valores de produção e sem aspas. Como a imagem roda em produção, AUTH_TRUST_PROXY=true é obrigatório e a API deve ficar acessível apenas pelo proxy que termina o TLS. Esse comando testa apenas a base HTTP. Não configura DNS, TLS ou um provedor OIDC. O container usa Node 24 e usuário sem privilégios. Quando persistência for implementada, o health de readiness deverá verificar suas dependências reais.
 
 ## Próxima entrega
 

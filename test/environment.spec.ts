@@ -17,6 +17,7 @@ const production = {
     NODE_ENV: 'production',
     AUTH_ISSUER: 'https://auth.presencia.com.br',
     FIREBASE_PROJECT_ID: 'presencia-prod',
+    AUTH_TRUST_PROXY: 'true',
 };
 const client = () => JSON.parse(valid['AUTH_CLIENTS'])[0] as Record<string, unknown>;
 const rejects = (change: Record<string, unknown>, name: string, base = valid) =>
@@ -106,6 +107,11 @@ describe('environment validation', () => {
     it.each(['http://127.0.0.1:9099', '127.0.0.1', 'host:9099/path'])(
         'rejects emulator host %s',
         host => rejects({ FIREBASE_AUTH_EMULATOR_HOST: host }, 'FIREBASE_AUTH_EMULATOR_HOST'),
+    );
+
+    it.each([undefined, 'false'])(
+        'requires a trusted proxy in production so cookies are Secure (%s)',
+        value => rejects({ AUTH_TRUST_PROXY: value }, 'AUTH_TRUST_PROXY', production),
     );
 
     it('rejects a demo- project id in production', () =>

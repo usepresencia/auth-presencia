@@ -136,6 +136,36 @@ describe('refresh tokens', () => {
 });
 
 describe('session lifetime', () => {
+    it('keeps the new refresh token when extending the session fails', async () => {
+        const { tokens } = await signedIn();
+        const schema = new URL(env.database.url).searchParams.get('schema');
+        const run = sql => env.database.prisma.$executeRawUnsafe(sql);
+        await run(`CREATE FUNCTION "${schema}".fail_session() RETURNS trigger LANGUAGE plpgsql
+            AS $$ BEGIN RAISE EXCEPTION 'fixture outage'; END $$`);
+        await run(`CREATE TRIGGER fail_session BEFORE UPDATE ON "${schema}".auth_oidc_artifacts
+            FOR EACH ROW WHEN (NEW.model = 'Session')
+            EXECUTE FUNCTION "${schema}".fail_session()`);
+        let result;
+        try {
+            result = await oauth.refresh(tokens.refresh_token).catch(error => ({ error }));
+        } finally {
+            await run(`DROP TRIGGER fail_session ON "${schema}".auth_oidc_artifacts`);
+            await run(`DROP FUNCTION "${schema}".fail_session()`);
+        }
+        assert.equal(result.status, 200, String(result.error ?? JSON.stringify(result.body)));
+        assert.equal((await oauth.refresh(result.body.refresh_token)).status, 200);
+    });
+
+    it('keeps sessions without a login only for the interaction window', async () => {
+        const rows = () =>
+            env.database.prisma.oidcArtifact.findMany({ where: { model: 'Session' } });
+        const known = new Set((await rows()).map(row => row.id));
+        await endSession(new Browser());
+        const created = (await rows()).filter(row => !known.has(row.id));
+        assert.equal(created.length, 1);
+        assert.ok(created[0].payload.exp - now() <= 600, String(created[0].payload.exp - now()));
+    });
+
     it('starts with seven days and a refresh token capped at fourteen', async () => {
         const { person } = await signedIn();
         near(await remaining(person.sub), 7 * day);
@@ -263,6 +293,31 @@ describe('logout through the front', () => {
         );
         assert.equal(success.status, 303);
         assert.equal(success.headers.get('location'), '/logout/success');
+    });
+
+    it('lets another person sign in over a session without returning HTML', async () => {
+        const first = await signedIn();
+        const second = await env.person();
+        const browser = first.browser;
+        const request = oauth.authorizationRequest({ prompt: 'login' });
+        const started = await oauth.follow(browser, request.url);
+        const asked = await oauth.follow(
+            browser,
+            started.front.pathname + '/__finish?sub=' + second.sub,
+        );
+        assert.equal(asked.front?.pathname, '/logout', String(asked.response.status));
+        assert.equal(asked.response.status, 303);
+        assert.equal(await asked.response.text(), '');
+        const info = await (await details(browser)).json();
+        const confirmed = await form(browser, info.action, { xsrf: info.xsrf, logout: 'yes' });
+        const finished = await oauth.follow(browser, confirmed.headers.get('location'));
+        const tokens = await oauth.exchange({
+            code: finished.callback.searchParams.get('code'),
+            verifier: request.verifier,
+        });
+        assert.equal(tokens.status, 200, JSON.stringify(tokens.body));
+        assert.equal(claims(tokens.body.access_token).sub, second.sub);
+        invalidGrant(await oauth.refresh(first.tokens.refresh_token));
     });
 
     it('never returns HTML to a browser without a session', async () => {

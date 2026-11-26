@@ -119,6 +119,13 @@ describe('Prisma adapter for oidc-provider', () => {
         assert.ok(await adapter('RefreshToken').find(kept.jti));
     });
 
+    it('keeps interactions that only reference the revoked grant', async () => {
+        const pending = await save('Interaction', token('grant-c'));
+        await save('RefreshToken', token('grant-c'));
+        await adapter('RefreshToken').revokeByGrantId('grant-c');
+        assert.ok(await adapter('Interaction').find(pending.jti));
+    });
+
     it('destroys one artifact and tolerates a missing one', async () => {
         const payload = await save('AuthorizationCode', token('grant'));
         await adapter('AuthorizationCode').destroy(payload.jti);

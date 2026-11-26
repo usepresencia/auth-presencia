@@ -5,6 +5,14 @@ import type { PrismaService } from '../../shared/infrastructure/persistence/pris
 
 /** Modelos cujo id é a própria credencial apresentada pelo client: só o hash é gravado. */
 const SECRET_ID_MODELS = new Set(['AuthorizationCode', 'RefreshToken']);
+/** Modelos que morrem com a concessão. Outros, como Interaction, apenas a referenciam. */
+const GRANTABLE_MODELS = new Set([
+    'AccessToken',
+    'AuthorizationCode',
+    'RefreshToken',
+    'DeviceCode',
+    'BackchannelAuthenticationRequest',
+]);
 const CLEANUP_BATCH = 100;
 
 class PrismaAdapter implements Adapter {
@@ -24,7 +32,7 @@ class PrismaAdapter implements Adapter {
         const stored = SECRET_ID_MODELS.has(this.model) ? rest : { ...rest, jti };
         const data = {
             payload: stored as Prisma.InputJsonObject,
-            grantId: payload.grantId ?? null,
+            grantId: GRANTABLE_MODELS.has(this.model) ? (payload.grantId ?? null) : null,
             uid: payload.uid ?? null,
             userCode: payload.userCode ?? null,
             expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000) : null,

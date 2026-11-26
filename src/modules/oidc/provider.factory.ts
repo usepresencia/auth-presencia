@@ -106,6 +106,8 @@ export function createProvider(
             Interaction: TTL.Interaction,
             // O provedor exige inteiros positivos; no limite, o artefato dura um segundo.
             Session: (_ctx, session) => {
+                // Sem login (ex.: logout anônimo) não há o que manter por dias.
+                if (!session.accountId) return TTL.Interaction;
                 const now = epochSeconds();
                 return Math.max(1, sessionTtl(session.loginTs ?? now, now));
             },
@@ -210,14 +212,25 @@ export function createProvider(
     provider.use(async (ctx, next) => {
         await next();
         const oidc = (ctx as unknown as { oidc?: OidcRequest }).oidc;
-        // Sem sessão o provedor responderia um formulário HTML: o front confirma igualmente.
-        if (oidc?.route === 'end_session' && ctx.status === 200) {
+        // O provedor responderia um formulário HTML no logout sem sessão e quando outra
+        // pessoa entra sobre uma sessão existente: nos dois casos o front confirma.
+        const htmlForm =
+            (oidc?.route === 'end_session' || oidc?.route === 'resume') && ctx.status === 200;
+        if (htmlForm) {
             redirectToFront(ctx, '/logout');
         }
         if (oidc?.route === 'token' && ctx.status === 200) {
             const sessionUid = oidc.entities.RefreshToken?.sessionUid;
             if (oidc.params?.['grant_type'] === 'refresh_token' && sessionUid) {
-                await extendSession(sessionUid);
+                // Melhor esforço: o refresh token antigo já foi consumido, então a resposta
+                // com o novo precisa chegar ao client mesmo se a renovação falhar.
+                await extendSession(sessionUid).catch((error: unknown) =>
+                    Logger.error(
+                        'Falha ao renovar a sessão: ' +
+                            (error instanceof Error ? error.name : 'desconhecida'),
+                        'OidcProvider',
+                    ),
+                );
             }
         }
     });
