@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../../shared/infrastructure/persistence/database.module';
-import { DatabaseConnection } from '../../shared/infrastructure/persistence/database';
+import { PrismaModule } from '../../shared/infrastructure/persistence/prisma.module';
+import { PrismaService } from '../../shared/infrastructure/persistence/prisma.service';
 import { IdentityService } from './application/identity.service';
-import { PostgresIdentityRepository } from './infrastructure/postgres-identity.repository';
+import { PrismaIdentityRepository } from './infrastructure/prisma-identity.repository';
 
 @Module({
-    imports: [DatabaseModule],
+    imports: [PrismaModule],
     providers: [
         {
             provide: IdentityService,
-            useFactory: (database: DatabaseConnection) =>
-                new IdentityService(new PostgresIdentityRepository(database)),
-            inject: [DatabaseConnection],
+            useFactory: (prisma: PrismaService) =>
+                new IdentityService(new PrismaIdentityRepository(prisma)),
+            inject: [PrismaService],
         },
     ],
     exports: [IdentityService],
