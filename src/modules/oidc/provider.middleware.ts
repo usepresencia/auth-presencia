@@ -8,7 +8,11 @@ const PROVIDER_PATHS = [
     '/authorize',
     '/token',
     '/me',
+    '/session',
 ];
+
+/** Rotas do Nest sob prefixos do provedor. */
+const NEST_PATHS = ['/session/logout-details'];
 
 const matches = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/');
 
@@ -18,6 +22,7 @@ export function oidcMiddleware(provider: Provider) {
         const url = new URL(request.url, 'http://placeholder');
         const path = url.pathname.toLowerCase();
         if (!PROVIDER_PATHS.some(prefix => matches(path, prefix))) return next();
+        if (NEST_PATHS.some(prefix => matches(path, prefix))) return next();
 
         // `form_post` devolveria HTML e `fragment` exporia o code ao navegador. Só GET com
         // `query` chega ao início da autorização.

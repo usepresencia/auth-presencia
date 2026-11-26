@@ -49,7 +49,7 @@ describe('application foundation', () => {
         expect(response.headers['location']).toBe('/error?error=invalid_request');
     });
 
-    it.each(['/unknown', '/authorized', '/tokens', '/session/end', '/reg'])(
+    it.each(['/unknown', '/authorized', '/tokens', '/sessions', '/reg'])(
         'does not expose %s',
         async path => {
             await request(app.getHttpServer()).get(path).expect(404);

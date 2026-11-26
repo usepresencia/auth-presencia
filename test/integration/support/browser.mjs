@@ -25,7 +25,11 @@ export class Browser {
             method,
             body,
             redirect: 'manual',
-            headers: { ...headers, cookie: this.header(url.pathname) },
+            headers: {
+                accept: 'text/html',
+                ...headers,
+                cookie: this.header(url.pathname),
+            },
         });
         for (const line of response.headers.getSetCookie()) {
             const parts = line.split(';').map(part => part.trim());

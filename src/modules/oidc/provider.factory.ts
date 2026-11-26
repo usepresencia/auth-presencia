@@ -7,21 +7,35 @@ import Provider, {
 } from 'oidc-provider';
 import type { ClientConfig, Environment } from '../../shared/config/environment';
 import type { Account, AccountService } from '../accounts/account.service';
-
-export const TTL = {
-    AuthorizationCode: 60,
-    AccessToken: 600,
-    IdToken: 600,
-    Interaction: 600,
-    Session: 604800,
-    Grant: 1209600,
-    RefreshToken: 1209600,
-} as const;
+import { absoluteRemaining, epochSeconds, sessionTtl, TTL } from './session-policy';
 
 export type ProviderSettings = Pick<
     Environment,
     'AUTH_ISSUER' | 'AUTH_JWKS' | 'AUTH_COOKIE_KEYS' | 'AUTH_CLIENTS' | 'AUTH_TRUST_PROXY'
 >;
+
+const GRANT_TOLERANCE_SECONDS = 5;
+
+interface FrontRedirect {
+    status: number;
+    body: unknown;
+    type: string;
+    set(name: string, value: string): void;
+}
+
+/** Entrega o navegador ao front sem corpo. */
+function redirectToFront(ctx: FrontRedirect, location: string): void {
+    ctx.status = 303;
+    ctx.set('location', location);
+    ctx.body = '';
+    ctx.type = 'text/plain';
+}
+
+interface OidcRequest {
+    route: string;
+    params?: Record<string, unknown>;
+    entities: { RefreshToken?: { sessionUid?: string } };
+}
 
 /** Conta carregada uma única vez por requisição, com as claims que irão para os tokens. */
 interface ProviderAccount {
@@ -35,6 +49,7 @@ export function createProvider(
     env: ProviderSettings,
     adapter: (model: string) => Adapter,
     accounts: AccountService,
+    extendSession: (uid: string) => Promise<void>,
 ): Provider {
     const clients = new Map<string, ClientConfig>(
         env.AUTH_CLIENTS.map(client => [client.clientId, client]),
@@ -48,6 +63,19 @@ export function createProvider(
     // Todos os clients são produtos próprios: não existe tela de consentimento.
     const policy = interactionPolicy.base();
     policy.remove('consent');
+    // Sessão cuja conta foi desativada ou teve credenciais revogadas exige novo login.
+    policy
+        .get('login')!
+        .checks.add(
+            new interactionPolicy.Check(
+                'account_unavailable',
+                'End-User authentication is required',
+                ctx =>
+                    ctx.oidc.session?.accountId && !ctx.oidc.account
+                        ? interactionPolicy.Check.REQUEST_PROMPT
+                        : interactionPolicy.Check.NO_NEED_TO_PROMPT,
+            ),
+        );
 
     const configuration: Configuration = {
         adapter,
@@ -71,8 +99,28 @@ export function createProvider(
         },
         conformIdTokenClaims: false,
         pkce: { required: () => true },
-        ttl: TTL,
+        ttl: {
+            AuthorizationCode: TTL.AuthorizationCode,
+            AccessToken: TTL.AccessToken,
+            IdToken: TTL.IdToken,
+            Interaction: TTL.Interaction,
+            // O provedor exige inteiros positivos; no limite, o artefato dura um segundo.
+            Session: (_ctx, session) => {
+                const now = epochSeconds();
+                return Math.max(1, sessionTtl(session.loginTs ?? now, now));
+            },
+            Grant: ctx => {
+                const now = epochSeconds();
+                return Math.max(1, absoluteRemaining(ctx?.oidc.session?.loginTs ?? now, now));
+            },
+            RefreshToken: (_ctx, token) => {
+                const now = epochSeconds();
+                const authTime = (token as { authTime?: number }).authTime ?? now;
+                return Math.max(1, absoluteRemaining(authTime, now));
+            },
+        },
         expiresWithSession: () => true,
+        rotateRefreshToken: () => true,
         issueRefreshToken: (_ctx, client) => client.grantTypeAllowed('refresh_token'),
         interactions: {
             policy,
@@ -80,6 +128,13 @@ export function createProvider(
         },
         features: {
             devInteractions: { enabled: false },
+            revocation: { enabled: true },
+            // Nenhuma tela é renderizada aqui: o front cuida da confirmação e do sucesso.
+            rpInitiatedLogout: {
+                enabled: true,
+                logoutSource: ctx => redirectToFront(ctx, '/logout'),
+                postLogoutSuccessSource: ctx => redirectToFront(ctx, '/logout/success'),
+            },
             resourceIndicators: {
                 enabled: true,
                 defaultResource: (_ctx, client) => clientConfig(client.clientId).resource,
@@ -102,7 +157,11 @@ export function createProvider(
             const session = ctx.oidc.session!;
             const grantId = session.grantIdFor(client.clientId);
             const existing = grantId ? await ctx.oidc.provider.Grant.find(grantId) : undefined;
-            if (existing) return existing;
+            // Uma concessão de login anterior venceria antes da sessão nova: substituí-la.
+            const loginTs = session.loginTs ?? epochSeconds();
+            const coversSession =
+                (existing?.exp ?? 0) >= loginTs + TTL.SessionAbsolute - GRANT_TOLERANCE_SECONDS;
+            if (existing && coversSession) return existing;
 
             const config = clientConfig(client.clientId);
             const grant = new ctx.oidc.provider.Grant({
@@ -142,15 +201,26 @@ export function createProvider(
             ) as Record<string, string>;
         },
         renderError(ctx, out) {
-            ctx.status = 303;
-            ctx.set('location', '/error?error=' + encodeURIComponent(out.error));
-            ctx.body = '';
-            ctx.type = 'text/plain';
+            redirectToFront(ctx, '/error?error=' + encodeURIComponent(out.error));
         },
     };
 
     const provider = new Provider(env.AUTH_ISSUER, configuration);
     provider.proxy = env.AUTH_TRUST_PROXY;
+    provider.use(async (ctx, next) => {
+        await next();
+        const oidc = (ctx as unknown as { oidc?: OidcRequest }).oidc;
+        // Sem sessão o provedor responderia um formulário HTML: o front confirma igualmente.
+        if (oidc?.route === 'end_session' && ctx.status === 200) {
+            redirectToFront(ctx, '/logout');
+        }
+        if (oidc?.route === 'token' && ctx.status === 200) {
+            const sessionUid = oidc.entities.RefreshToken?.sessionUid;
+            if (oidc.params?.['grant_type'] === 'refresh_token' && sessionUid) {
+                await extendSession(sessionUid);
+            }
+        }
+    });
     // Só o tipo do erro: mensagens do protocolo podem carregar valores sensíveis.
     provider.on('server_error', (_ctx, error) =>
         Logger.error('Falha no provedor OIDC: ' + error.name, 'OidcProvider'),

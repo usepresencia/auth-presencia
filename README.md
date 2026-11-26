@@ -27,7 +27,7 @@ O serviço escuta em http://localhost:3340 por padrão. AUTH_ISSUER deve represe
 
 - GET /health/live: 200 quando o processo HTTP responde.
 - GET /health/ready: 503 enquanto provedor e persistência não estiverem implementados; não utilizar como readiness de uma implantação funcional ainda.
-- Protocolo OIDC publicado: discovery em /.well-known/openid-configuration, /jwks, /authorize, /token e /me. As rotas de login para o front estão em [docs/contracts/interaction.openapi.yaml](docs/contracts/interaction.openapi.yaml). Logout e endpoints de gestão ainda não estão publicados, e não há limite próprio de tentativas de login (#15): não usar em produção.
+- Protocolo OIDC publicado: discovery em /.well-known/openid-configuration, /jwks, /authorize, /token e /me. As rotas de login para o front estão em [docs/contracts/interaction.openapi.yaml](docs/contracts/interaction.openapi.yaml). Renovação (refresh token rotativo), revogação em /token/revocation e logout em /session/end também estão publicados; o contrato do logout está no mesmo arquivo. Sessão: 7 dias de inatividade, renovados pelo uso do refresh token, com teto de 14 dias desde o login. Endpoints de gestão ainda não existem, e não há limite próprio de tentativas de login (#15): não usar em produção.
 
 ## Estrutura
 
