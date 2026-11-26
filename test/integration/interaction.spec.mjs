@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 import { buildTestApp, oauthClient } from './support/app.mjs';
 import { Browser } from './support/browser.mjs';
 
@@ -176,13 +177,43 @@ describe('login routes for the front', () => {
         await expectCode(await post(flow, 'login', credentials), 410, 'INTERACTION_EXPIRED');
     });
 
-    it('tolerates a double submit before the redirect is followed', async () => {
+    it('checks the password once for a simultaneous double submit', async () => {
         const flow = await start();
-        const responses = await Promise.all([
-            post(flow, 'login', credentials),
-            post(flow, 'login', credentials),
-        ]);
-        for (const response of responses) assert.ok(response.status === 200, response.status);
+        const calls = env.gateway.calls;
+        const original = env.gateway.signIn;
+        env.gateway.signIn = async function (...parameters) {
+            // Mantém a primeira verificação em andamento até a segunda chegar.
+            await setTimeout(300);
+            return original.apply(this, parameters);
+        };
+        let responses;
+        try {
+            responses = await Promise.all([
+                post(flow, 'login', credentials),
+                post(flow, 'login', credentials),
+            ]);
+        } finally {
+            env.gateway.signIn = original;
+        }
+        for (const response of responses) assert.equal(response.status, 200);
+        assert.equal(env.gateway.calls, calls + 1);
+    });
+
+    it('repeats the redirect without a new password check after a finished login', async () => {
+        const flow = await start();
+        const first = await (await post(flow, 'login', credentials)).json();
+        const calls = env.gateway.calls;
+        const again = await post(flow, 'login', credentials);
+        assert.equal(again.status, 200);
+        assert.deepEqual(await again.json(), first);
+        assert.equal(env.gateway.calls, calls);
+    });
+
+    it('checks the password again after a failed attempt', async () => {
+        const flow = await start();
+        const wrong = { ...credentials, password: 'wrong' };
+        assert.equal((await post(flow, 'login', wrong)).status, 401);
+        assert.equal((await post(flow, 'login', credentials)).status, 200);
     });
 
     it('keeps two parallel logins independent', async () => {

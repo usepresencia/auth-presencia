@@ -112,6 +112,15 @@ export const environmentSchema = z
                 message: 'Produção exige issuer HTTPS.',
             });
         }
+        // A API atende HTTP atrás do proxy que termina o TLS; sem confiar nele os cookies
+        // sairiam sem `Secure`.
+        if (env.NODE_ENV === 'production' && !env.AUTH_TRUST_PROXY) {
+            ctx.addIssue({
+                code: 'custom',
+                path: ['AUTH_TRUST_PROXY'],
+                message: 'Produção exige proxy TLS confiável (AUTH_TRUST_PROXY=true).',
+            });
+        }
         // O emulador aceita tokens sem assinatura: nunca em produção.
         if (env.NODE_ENV === 'production' && env.FIREBASE_AUTH_EMULATOR_HOST) {
             ctx.addIssue({

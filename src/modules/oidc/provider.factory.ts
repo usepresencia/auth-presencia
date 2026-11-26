@@ -7,21 +7,35 @@ import Provider, {
 } from 'oidc-provider';
 import type { ClientConfig, Environment } from '../../shared/config/environment';
 import type { Account, AccountService } from '../accounts/account.service';
-
-export const TTL = {
-    AuthorizationCode: 60,
-    AccessToken: 600,
-    IdToken: 600,
-    Interaction: 600,
-    Session: 604800,
-    Grant: 1209600,
-    RefreshToken: 1209600,
-} as const;
+import { absoluteRemaining, epochSeconds, sessionTtl, TTL } from './session-policy';
 
 export type ProviderSettings = Pick<
     Environment,
     'AUTH_ISSUER' | 'AUTH_JWKS' | 'AUTH_COOKIE_KEYS' | 'AUTH_CLIENTS' | 'AUTH_TRUST_PROXY'
 >;
+
+const GRANT_TOLERANCE_SECONDS = 5;
+
+interface FrontRedirect {
+    status: number;
+    body: unknown;
+    type: string;
+    set(name: string, value: string): void;
+}
+
+/** Entrega o navegador ao front sem corpo. */
+function redirectToFront(ctx: FrontRedirect, location: string): void {
+    ctx.status = 303;
+    ctx.set('location', location);
+    ctx.body = '';
+    ctx.type = 'text/plain';
+}
+
+interface OidcRequest {
+    route: string;
+    params?: Record<string, unknown>;
+    entities: { RefreshToken?: { sessionUid?: string } };
+}
 
 /** Conta carregada uma única vez por requisição, com as claims que irão para os tokens. */
 interface ProviderAccount {
@@ -31,10 +45,16 @@ interface ProviderAccount {
     [name: string]: unknown;
 }
 
+/** Conta sem claims para um artefato já consumido; nenhum token é emitido com ela. */
+function replayedAccount(sub: string): ProviderAccount {
+    return { accountId: sub, profile: {}, claims: async () => ({ sub }) };
+}
+
 export function createProvider(
     env: ProviderSettings,
     adapter: (model: string) => Adapter,
     accounts: AccountService,
+    extendSession: (uid: string) => Promise<void>,
 ): Provider {
     const clients = new Map<string, ClientConfig>(
         env.AUTH_CLIENTS.map(client => [client.clientId, client]),
@@ -48,6 +68,19 @@ export function createProvider(
     // Todos os clients são produtos próprios: não existe tela de consentimento.
     const policy = interactionPolicy.base();
     policy.remove('consent');
+    // Sessão cuja conta foi desativada ou teve credenciais revogadas exige novo login.
+    policy
+        .get('login')!
+        .checks.add(
+            new interactionPolicy.Check(
+                'account_unavailable',
+                'End-User authentication is required',
+                ctx =>
+                    ctx.oidc.session?.accountId && !ctx.oidc.account
+                        ? interactionPolicy.Check.REQUEST_PROMPT
+                        : interactionPolicy.Check.NO_NEED_TO_PROMPT,
+            ),
+        );
 
     const configuration: Configuration = {
         adapter,
@@ -60,6 +93,9 @@ export function createProvider(
             grant_types: ['authorization_code', 'refresh_token'],
             token_endpoint_auth_method: 'client_secret_basic',
         })),
+        // O discovery anuncia só o que a API aceita.
+        responseTypes: ['code'],
+        clientAuthMethods: ['client_secret_basic'],
         jwks: env.AUTH_JWKS as Configuration['jwks'],
         cookies: { keys: env.AUTH_COOKIE_KEYS },
         routes: { authorization: '/authorize' },
@@ -71,8 +107,30 @@ export function createProvider(
         },
         conformIdTokenClaims: false,
         pkce: { required: () => true },
-        ttl: TTL,
+        ttl: {
+            AuthorizationCode: TTL.AuthorizationCode,
+            AccessToken: TTL.AccessToken,
+            IdToken: TTL.IdToken,
+            Interaction: TTL.Interaction,
+            // O provedor exige inteiros positivos; no limite, o artefato dura um segundo.
+            Session: (_ctx, session) => {
+                // Sem login (ex.: logout anônimo) não há o que manter por dias.
+                if (!session.accountId) return TTL.Interaction;
+                const now = epochSeconds();
+                return Math.max(1, sessionTtl(session.loginTs ?? now, now));
+            },
+            Grant: ctx => {
+                const now = epochSeconds();
+                return Math.max(1, absoluteRemaining(ctx?.oidc.session?.loginTs ?? now, now));
+            },
+            RefreshToken: (_ctx, token) => {
+                const now = epochSeconds();
+                const authTime = (token as { authTime?: number }).authTime ?? now;
+                return Math.max(1, absoluteRemaining(authTime, now));
+            },
+        },
         expiresWithSession: () => true,
+        rotateRefreshToken: () => true,
         issueRefreshToken: (_ctx, client) => client.grantTypeAllowed('refresh_token'),
         interactions: {
             policy,
@@ -80,6 +138,15 @@ export function createProvider(
         },
         features: {
             devInteractions: { enabled: false },
+            pushedAuthorizationRequests: { enabled: false },
+            dPoP: { enabled: false },
+            revocation: { enabled: true },
+            // Nenhuma tela é renderizada aqui: o front cuida da confirmação e do sucesso.
+            rpInitiatedLogout: {
+                enabled: true,
+                logoutSource: ctx => redirectToFront(ctx, '/logout'),
+                postLogoutSuccessSource: ctx => redirectToFront(ctx, '/logout/success'),
+            },
             resourceIndicators: {
                 enabled: true,
                 defaultResource: (_ctx, client) => clientConfig(client.clientId).resource,
@@ -102,7 +169,11 @@ export function createProvider(
             const session = ctx.oidc.session!;
             const grantId = session.grantIdFor(client.clientId);
             const existing = grantId ? await ctx.oidc.provider.Grant.find(grantId) : undefined;
-            if (existing) return existing;
+            // Uma concessão de login anterior venceria antes da sessão nova: substituí-la.
+            const loginTs = session.loginTs ?? epochSeconds();
+            const coversSession =
+                (existing?.exp ?? 0) >= loginTs + TTL.SessionAbsolute - GRANT_TOLERANCE_SECONDS;
+            if (existing && coversSession) return existing;
 
             const config = clientConfig(client.clientId);
             const grant = new ctx.oidc.provider.Grant({
@@ -118,8 +189,11 @@ export function createProvider(
             const clientId = ctx.oidc.client?.clientId;
             // Sem token (autorização), vale o momento do login da sessão: credenciais
             // revogadas depois dele exigem novo login.
-            const authTime =
-                (token as { authTime?: number } | undefined)?.authTime ?? ctx.oidc.session?.loginTs;
+            const artifact = token as { authTime?: number; consumed?: unknown } | undefined;
+            // Reuso: o provedor só revoga a família depois de carregar a conta, e o pedido
+            // será recusado de qualquer forma. Não depender do Firebase nesse caminho.
+            if (artifact?.consumed) return replayedAccount(sub);
+            const authTime = artifact?.authTime ?? ctx.oidc.session?.loginTs;
             const account = await accounts.load(sub, {
                 firebaseClaims: clientId ? clientConfig(clientId).firebaseClaims : [],
                 authTime,
@@ -142,18 +216,49 @@ export function createProvider(
             ) as Record<string, string>;
         },
         renderError(ctx, out) {
-            ctx.status = 303;
-            ctx.set('location', '/error?error=' + encodeURIComponent(out.error));
-            ctx.body = '';
-            ctx.type = 'text/plain';
+            redirectToFront(ctx, '/error?error=' + encodeURIComponent(out.error));
         },
     };
 
     const provider = new Provider(env.AUTH_ISSUER, configuration);
     provider.proxy = env.AUTH_TRUST_PROXY;
+    provider.use(async (ctx, next) => {
+        await next();
+        const oidc = (ctx as unknown as { oidc?: OidcRequest }).oidc;
+        // A lista de modos é fixa no provedor; o middleware só deixa passar `query`.
+        if (oidc?.route === 'discovery') {
+            (ctx.body as Record<string, unknown>)['response_modes_supported'] = ['query'];
+        }
+        // O provedor responderia um formulário HTML no logout sem sessão e quando outra
+        // pessoa entra sobre uma sessão existente: nos dois casos o front confirma.
+        const htmlForm =
+            (oidc?.route === 'end_session' || oidc?.route === 'resume') && ctx.status === 200;
+        if (htmlForm) {
+            redirectToFront(ctx, '/logout');
+        }
+        if (oidc?.route === 'token' && ctx.status === 200) {
+            const sessionUid = oidc.entities.RefreshToken?.sessionUid;
+            if (oidc.params?.['grant_type'] === 'refresh_token' && sessionUid) {
+                // Melhor esforço: o refresh token antigo já foi consumido, então a resposta
+                // com o novo precisa chegar ao client mesmo se a renovação falhar.
+                await extendSession(sessionUid).catch((error: unknown) =>
+                    Logger.error(
+                        'Falha ao renovar a sessão: ' +
+                            (error instanceof Error ? error.name : 'desconhecida'),
+                        'OidcProvider',
+                    ),
+                );
+            }
+        }
+    });
     // Só o tipo do erro: mensagens do protocolo podem carregar valores sensíveis.
     provider.on('server_error', (_ctx, error) =>
         Logger.error('Falha no provedor OIDC: ' + error.name, 'OidcProvider'),
+    );
+    // Falhas fora das rotas do protocolo: sem este ouvinte, o Koa imprime o stack completo.
+    // A tipagem do provedor não declara o evento herdado do Koa.
+    (provider as unknown as NodeJS.EventEmitter).on('error', (error: Error) =>
+        Logger.error('Falha na requisição OIDC: ' + error.name, 'OidcProvider'),
     );
     return provider;
 }

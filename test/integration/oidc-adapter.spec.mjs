@@ -59,7 +59,10 @@ describe('Prisma adapter for oidc-provider', () => {
 
     it('finds a session by uid and by user code', async () => {
         const session = await save('Session', { jti: randomUUID(), uid: 'the-uid' });
-        assert.equal((await adapter('Session').findByUid('the-uid')).jti, session.jti);
+        const found = await adapter('Session').findByUid('the-uid');
+        assert.equal(found.uid, session.uid);
+        // Só o hash é gravado: a busca por uid não recupera o id.
+        assert.equal(found.jti, undefined);
         const device = await save('DeviceCode', { jti: randomUUID(), userCode: 'CODE' });
         assert.equal((await adapter('DeviceCode').findByUserCode('CODE')).jti, device.jti);
     });
@@ -72,6 +75,19 @@ describe('Prisma adapter for oidc-provider', () => {
             assert.equal((await adapter(model).find(payload.jti)).jti, payload.jti);
         });
     }
+
+    it('never stores a Session id in clear text, not even inside an interaction', async () => {
+        const session = await save('Session', { jti: randomUUID(), uid: 'secret-session' });
+        await save('Interaction', {
+            jti: randomUUID(),
+            session: { uid: 'secret-session', accountId: 'sub', cookie: session.jti },
+        });
+        const rows = await prisma.oidcArtifact.findMany();
+        assert.ok(!JSON.stringify(rows).includes(session.jti));
+        assert.equal((await adapter('Session').find(session.jti)).jti, session.jti);
+        await adapter('Session').destroy(session.jti);
+        assert.equal(await adapter('Session').find(session.jti), undefined);
+    });
 
     it('marks consumed artifacts and keeps the mark after a new upsert', async () => {
         const payload = await save('RefreshToken', token('grant'));
@@ -117,6 +133,13 @@ describe('Prisma adapter for oidc-provider', () => {
         await adapter('RefreshToken').revokeByGrantId('grant-a');
         assert.equal(await adapter('RefreshToken').find(gone.jti), undefined);
         assert.ok(await adapter('RefreshToken').find(kept.jti));
+    });
+
+    it('keeps interactions that only reference the revoked grant', async () => {
+        const pending = await save('Interaction', token('grant-c'));
+        await save('RefreshToken', token('grant-c'));
+        await adapter('RefreshToken').revokeByGrantId('grant-c');
+        assert.ok(await adapter('Interaction').find(pending.jti));
     });
 
     it('destroys one artifact and tolerates a missing one', async () => {

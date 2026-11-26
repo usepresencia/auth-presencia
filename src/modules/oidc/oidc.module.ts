@@ -8,13 +8,15 @@ import { AccountsModule } from '../accounts/accounts.module';
 import { InteractionController } from './interaction.controller';
 import { OIDC_PROVIDER } from './oidc.tokens';
 import { createPrismaAdapter } from './prisma.adapter';
+import { LogoutController } from './logout.controller';
 import { createProvider } from './provider.factory';
+import { createSessionExtension } from './session-extension';
 
 export { OIDC_PROVIDER };
 
 @Module({
     imports: [PrismaModule, AccountsModule],
-    controllers: [InteractionController],
+    controllers: [InteractionController, LogoutController],
     providers: [
         {
             provide: OIDC_PROVIDER,
@@ -33,6 +35,7 @@ export { OIDC_PROVIDER };
                     },
                     createPrismaAdapter(prisma),
                     accounts,
+                    createSessionExtension(prisma),
                 ),
             inject: [ConfigService, PrismaService, AccountService],
         },

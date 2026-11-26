@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
 import { after, before, describe, it } from 'node:test';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import { buildTestApp, oauthClient } from './support/app.mjs';
@@ -30,6 +32,39 @@ describe('authorization code flow', () => {
         const keys = (await json('/jwks')).keys;
         assert.equal(keys[0].kid, 'integration');
         assert.equal(keys[0].d, undefined);
+    });
+
+    it('advertises only what the api accepts', async () => {
+        const discovery = await json('/.well-known/openid-configuration');
+        assert.deepEqual(discovery.response_types_supported, ['code']);
+        assert.deepEqual(discovery.response_modes_supported, ['query']);
+        assert.deepEqual([...discovery.grant_types_supported].sort(), [
+            'authorization_code',
+            'refresh_token',
+        ]);
+        assert.deepEqual(discovery.token_endpoint_auth_methods_supported, ['client_secret_basic']);
+        assert.equal(discovery.pushed_authorization_request_endpoint, undefined);
+        assert.equal(discovery.dpop_signing_alg_values_supported, undefined);
+    });
+
+    it('logs only the error name when a request fails outside the protocol routes', async () => {
+        const { provider } = await env.secondInstance();
+        provider.use(() => {
+            throw new TypeError('sensitive-fixture-detail');
+        });
+        const server = createServer(provider.callback()).listen(0, '127.0.0.1');
+        await once(server, 'listening');
+        const printed = [];
+        const original = console.error;
+        console.error = (...parts) => printed.push(parts.join(' '));
+        try {
+            const response = await fetch('http://127.0.0.1:' + server.address().port + '/jwks');
+            assert.equal(response.status, 500);
+        } finally {
+            console.error = original;
+            server.close();
+        }
+        assert.ok(!printed.join('\n').includes('sensitive-fixture-detail'), printed.join('\n'));
     });
 
     it('issues an api-kontal access token and a web-kontal id token', async () => {
