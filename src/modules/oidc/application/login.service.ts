@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { Logger } from '@nestjs/common';
+import { errorName } from '../../../shared/utils/error-name';
 import type { AuditService } from '../../audit/application/audit.service';
 import { AppError } from '../../errors/model/app.error';
 import type { AccountService } from '../../accounts/application/account.service';
@@ -89,14 +91,23 @@ export class LoginService {
             { rule: LIMITS.loginByAddress, subject: address },
         ];
         await this.limiter.consume([own, ...shared]);
+        let accountId: string;
         try {
-            const accountId = await this.accounts.signIn(email, password);
-            await this.limiter.clear(own);
-            await this.limiter.refund(shared);
-            return accountId;
+            accountId = await this.accounts.signIn(email, password);
         } catch (error) {
-            if (!(error instanceof SignInError)) await this.limiter.refund([own, ...shared]);
+            if (!(error instanceof SignInError)) {
+                await this.bestEffort(this.limiter.refund([own, ...shared]));
+            }
             throw error;
         }
+        await this.bestEffort(this.limiter.clear(own));
+        await this.bestEffort(this.limiter.refund(shared));
+        return accountId;
+    }
+
+    private bestEffort(adjustment: Promise<void>): Promise<void> {
+        return adjustment.catch((error: unknown) =>
+            Logger.warn('Falha ao ajustar o limite: ' + errorName(error), 'LoginService'),
+        );
     }
 }
