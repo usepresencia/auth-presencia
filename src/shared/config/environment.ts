@@ -60,11 +60,26 @@ const environmentSchema = z
                 value => ['postgres:', 'postgresql:'].includes(new URL(value).protocol),
                 'DATABASE_URL deve usar PostgreSQL.',
             ),
-        AUTH_JWKS: json(z.object({ keys: z.array(signingKeySchema).min(1) })),
+        AUTH_JWKS: json(
+            z.object({
+                keys: z
+                    .array(signingKeySchema)
+                    .min(1)
+                    .refine(
+                        keys => new Set(keys.map(k => k.kid)).size === keys.length,
+                        'kid repetido.',
+                    ),
+            }),
+        ),
         AUTH_COOKIE_KEYS: z
             .string()
             .transform(value => value.split(','))
-            .pipe(z.array(z.string().min(32)).min(1)),
+            .pipe(
+                z
+                    .array(z.string().min(32))
+                    .min(1)
+                    .refine(keys => new Set(keys).size === keys.length, 'Chave repetida.'),
+            ),
         AUTH_CLIENTS: json(clientsSchema),
         AUTH_TRUST_PROXY: z
             .enum(['true', 'false'])

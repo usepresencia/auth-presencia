@@ -53,6 +53,24 @@ Cada produto é um item de `AUTH_CLIENTS`. Alterações valem após reiniciar a 
 
 Gere o segredo com `node scripts/generate-keys.mjs`. O auth não guarda quem pode acessar cada produto: isso é responsabilidade da API dele.
 
+## Rotação de chaves
+
+A primeira chave de `AUTH_JWKS` e de `AUTH_COOKIE_KEYS` é a que assina; as demais só validam. `node scripts/key-rotation.mjs <passo>` lê as duas variáveis do ambiente e imprime os novos valores, sem gravar arquivos. Faça um deploy depois de cada passo:
+
+1. `add`: publica a chave nova. Espere as APIs atualizarem o JWKS (pelo menos 10 minutos).
+2. `promote`: a chave nova passa a assinar. Espere os tokens antigos vencerem (10 minutos); para os cookies, até 14 dias.
+3. `retire`: remove as chaves antigas.
+
+Retirar uma chave de cookie antes de 14 dias faz quem ainda a usa entrar de novo.
+
+### Chave comprometida
+
+1. Rode `node scripts/key-rotation.mjs replace`, atualize o ambiente e faça o deploy.
+2. Todos precisam entrar de novo. As APIs recusam os tokens antigos quando atualizam o JWKS; reinicie-as para não esperar o cache.
+3. Se houver suspeita de acesso ao banco, apague também `auth_oidc_artifacts`, o que invalida os refresh tokens.
+
+As chaves ficam no ambiente do servidor: restrinja a leitura do arquivo e guarde uma cópia protegida para restauração. Sem chaves válidas a API não inicia.
+
 ## Erros
 
 Rotas próprias respondem `statusCode`, `code`, `message`, `error` e `correlationId`; as rotas do protocolo seguem o formato do OAuth. Falhas 5xx são gravadas em `logs/{correlationId}/entries` no Firestore, lidas pela tela de Logs do web-admin-console, sem a mensagem original do erro. O header `x-correlation-id` é aceito e devolvido.
