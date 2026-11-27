@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type Provider from 'oidc-provider';
+import type { AuditEvent, AuditEventType } from '../../../audit/model/audit-event';
 import { CORRELATION_HEADER, resolveCorrelationId } from '../../../errors/model/correlation-id';
 import type { ErrorReport } from '../../../errors/model/error-log';
 import { errorName } from '../../../../shared/utils/error-name';
@@ -9,6 +10,29 @@ interface OidcRequest {
     route: string;
     params?: Record<string, unknown>;
     entities: { RefreshToken?: { sessionUid?: string } };
+}
+
+export interface ProviderEvents {
+    extendSession: (uid: string) => Promise<void>;
+    reportError: (report: ErrorReport) => void;
+    audit: (event: AuditEvent) => void;
+}
+
+const REUSE_DETAILS = [
+    'refresh token already used',
+    'authorization code already consumed',
+    'artifact already consumed',
+];
+
+interface AuditedRequest {
+    ip: string;
+    get(header: string): string;
+    oidc: {
+        client?: { clientId: string };
+        entities: Partial<
+            Record<'RefreshToken' | 'AuthorizationCode' | 'Session', { accountId?: string }>
+        >;
+    };
 }
 
 interface FailedRequest {
@@ -26,9 +50,22 @@ const logFailure = (message: string) => (error: unknown) =>
  */
 export function registerHooks(
     provider: Provider,
-    extendSession: (uid: string) => Promise<void>,
-    reportError: (report: ErrorReport) => void,
+    { extendSession, reportError, audit }: ProviderEvents,
 ): void {
+    const auditFrom = (type: AuditEventType, ctx: AuditedRequest) => {
+        const { entities, client } = ctx.oidc;
+        const identityId =
+            entities.RefreshToken?.accountId ??
+            entities.AuthorizationCode?.accountId ??
+            entities.Session?.accountId;
+        audit({
+            type,
+            correlationId: resolveCorrelationId(ctx.get(CORRELATION_HEADER)),
+            address: ctx.ip,
+            ...(identityId ? { identityId } : {}),
+            ...(client ? { clientId: client.clientId } : {}),
+        });
+    };
     const reportFailure = (message: string, error: unknown, ctx?: FailedRequest) => {
         logFailure(message)(error);
         if (!ctx) return;
@@ -57,6 +94,13 @@ export function registerHooks(
                 await extendSession(sessionUid).catch(logFailure('Falha ao renovar a sessão'));
             }
         }
+    });
+    provider.on('grant.error', (ctx, error) => {
+        const detail = (error as { error_detail?: string }).error_detail ?? '';
+        if (REUSE_DETAILS.includes(detail)) auditFrom('token_reuse_detected', ctx);
+    });
+    provider.on('end_session.success', ctx => {
+        if (ctx.oidc.entities.Session?.accountId) auditFrom('logout', ctx);
     });
     provider.on('server_error', (ctx, error) =>
         reportFailure('Falha no provedor OIDC', error, ctx),

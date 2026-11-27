@@ -58,3 +58,19 @@ model RateLimit {
   @@index([updatedAt])
   @@map("auth_rate_limits")
 }
+
+model AuditEvent {
+  id            String   @id @db.Uuid
+  type          String
+  occurredAt    DateTime @map("occurred_at") @db.Timestamptz(6)
+  identityId    String?  @map("identity_id") @db.Uuid
+  clientId      String?  @map("client_id")
+  correlationId String?  @map("correlation_id")
+  reason        String?
+  emailHash     String?  @map("email_hash")
+  addressHash   String?  @map("address_hash")
+
+  @@index([occurredAt])
+  @@index([identityId, occurredAt])
+  @@map("auth_audit_events")
+}

@@ -1,13 +1,12 @@
 import Provider, { errors, type Adapter, type Configuration } from 'oidc-provider';
 import type { Environment } from '../../../../shared/config/environment';
 import type { AccountService } from '../../../accounts/application/account.service';
-import type { ErrorReport } from '../../../errors/model/error-log';
 import { TTL } from '../../model/session-policy';
 import { accountSupport } from './accounts';
 import { clientRegistry } from './client-registry';
 import { redirectToFront } from './front-redirect';
 import { loadGrant } from './grants';
-import { registerHooks } from './hooks';
+import { registerHooks, type ProviderEvents } from './hooks';
 import { loginPolicy } from './interaction-policy';
 import { lifetimes } from './lifetimes';
 
@@ -20,15 +19,13 @@ export type ProviderSettings = Pick<
  * Cria o provedor OIDC com os clients configurados, sem telas próprias: login, logout e
  * erros são entregues ao front por redirecionamento.
  *
- * @param extendSession renova a sessão após o uso de um refresh token.
- * @param reportError recebe as falhas internas das rotas do protocolo.
+ * @param events destinos da renovação de sessão, das falhas internas e da auditoria.
  */
 export function createProvider(
     env: ProviderSettings,
     adapter: (model: string) => Adapter,
     accounts: AccountService,
-    extendSession: (uid: string) => Promise<void>,
-    reportError: (report: ErrorReport) => void,
+    events: ProviderEvents,
 ): Provider {
     const clientConfig = clientRegistry(env.AUTH_CLIENTS);
 
@@ -101,6 +98,6 @@ export function createProvider(
 
     const provider = new Provider(env.AUTH_ISSUER, configuration);
     provider.proxy = env.AUTH_TRUST_PROXY;
-    registerHooks(provider, extendSession, reportError);
+    registerHooks(provider, events);
     return provider;
 }

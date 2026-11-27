@@ -12,6 +12,8 @@ import { RecordErrorService } from '../errors/application/record-error.service';
 import { ErrorsModule } from '../errors/errors.module';
 import { RateLimiterService } from '../protection/application/rate-limiter.service';
 import { ProtectionModule } from '../protection/protection.module';
+import { AuditService } from '../audit/application/audit.service';
+import { AuditModule } from '../audit/audit.module';
 import { LoginService } from './application/login.service';
 import { createPrismaAdapter } from './infrastructure/prisma-oidc.adapter';
 import { LogoutController } from './presentation/logout.controller';
@@ -19,14 +21,17 @@ import { createProvider } from './infrastructure/provider/provider.factory';
 import { createSessionExtension } from './infrastructure/prisma-session.extension';
 
 @Module({
-    imports: [PersistenceModule, AccountsModule, ErrorsModule, ProtectionModule],
+    imports: [PersistenceModule, AccountsModule, ErrorsModule, ProtectionModule, AuditModule],
     controllers: [InteractionController, LogoutController],
     providers: [
         {
             provide: LoginService,
-            useFactory: (accounts: AccountService, limiter: RateLimiterService) =>
-                new LoginService(accounts, limiter),
-            inject: [AccountService, RateLimiterService],
+            useFactory: (
+                accounts: AccountService,
+                limiter: RateLimiterService,
+                audit: AuditService,
+            ) => new LoginService(accounts, limiter, audit),
+            inject: [AccountService, RateLimiterService, AuditService],
         },
         {
             provide: OIDC_PROVIDER,
@@ -35,6 +40,7 @@ import { createSessionExtension } from './infrastructure/prisma-session.extensio
                 prisma: PrismaService,
                 accounts: AccountService,
                 errors: RecordErrorService,
+                audit: AuditService,
             ) =>
                 createProvider(
                     pickConfig(
@@ -47,10 +53,20 @@ import { createSessionExtension } from './infrastructure/prisma-session.extensio
                     ),
                     createPrismaAdapter(prisma),
                     accounts,
-                    createSessionExtension(prisma),
-                    report => void errors.record({ ...report, code: 'INTERNAL_ERROR' }),
+                    {
+                        extendSession: createSessionExtension(prisma),
+                        reportError: report =>
+                            void errors.record({ ...report, code: 'INTERNAL_ERROR' }),
+                        audit: event => void audit.record(event),
+                    },
                 ),
-            inject: [ConfigService, PrismaService, AccountService, RecordErrorService],
+            inject: [
+                ConfigService,
+                PrismaService,
+                AccountService,
+                RecordErrorService,
+                AuditService,
+            ],
         },
     ],
     exports: [OIDC_PROVIDER],
