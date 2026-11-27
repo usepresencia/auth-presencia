@@ -1,5 +1,5 @@
 import { errors } from 'oidc-provider';
-import type { ClientConfig } from '../../../../shared/config/environment';
+import type { ClientConfig } from '../../../../shared/config/clients';
 
 export type ClientRegistry = (clientId: string) => ClientConfig;
 

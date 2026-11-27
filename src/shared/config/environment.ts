@@ -1,6 +1,6 @@
 import { z } from 'zod';
-
-const isLoopback = (url: URL) => ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+import { clientsSchema } from './clients';
+import { isLoopback } from './redirect-uri';
 
 const issuerSchema = z.url().superRefine((value, ctx) => {
     const url = new URL(value);
@@ -18,12 +18,6 @@ const issuerSchema = z.url().superRefine((value, ctx) => {
         });
     }
 });
-
-const redirectSchema = z.url().refine(value => {
-    const url = new URL(value);
-    const secure = url.protocol === 'https:' || (url.protocol === 'http:' && isLoopback(url));
-    return secure && !url.username && !url.password && !value.includes('#');
-}, 'Redirect exige HTTPS (HTTP apenas em loopback), sem credenciais ou fragmento.');
 
 function json<T extends z.ZodType>(schema: T) {
     return z
@@ -54,19 +48,6 @@ const signingKeySchema = z.looseObject({
     d: z.string().min(1),
 });
 
-const clientSchema = z.strictObject({
-    clientId: z.string().min(1),
-    clientSecret: z.string().min(32),
-    redirectUris: z.array(redirectSchema).min(1),
-    postLogoutRedirectUris: z.array(redirectSchema),
-    resource: z.url(),
-    audience: z.string().min(1),
-    scope: z.string().min(1),
-    firebaseClaims: z.array(z.string().min(1)),
-});
-
-export type ClientConfig = z.infer<typeof clientSchema>;
-
 const environmentSchema = z
     .object({
         NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -84,15 +65,7 @@ const environmentSchema = z
             .string()
             .transform(value => value.split(','))
             .pipe(z.array(z.string().min(32)).min(1)),
-        AUTH_CLIENTS: json(
-            z
-                .array(clientSchema)
-                .min(1)
-                .refine(
-                    clients => new Set(clients.map(c => c.clientId)).size === clients.length,
-                    'clientId duplicado.',
-                ),
-        ),
+        AUTH_CLIENTS: json(clientsSchema),
         AUTH_TRUST_PROXY: z
             .enum(['true', 'false'])
             .default('false')
