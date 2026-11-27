@@ -23,15 +23,15 @@ O serviço escuta em http://localhost:3340. AUTH_ISSUER é a origem pública est
 
 ## Rotas
 
-| Rota                                   | Uso                                       |
-| -------------------------------------- | ----------------------------------------- |
-| `/.well-known/openid-configuration`    | Discovery                                 |
-| `/jwks`, `/authorize`, `/token`, `/me` | Protocolo OIDC                            |
-| `/token/revocation`, `/session/end`    | Revogação e logout                        |
-| `/interaction/:uid/{details,login,…}`  | Login e recuperação de senha para o front |
-| `/session/logout-details`              | Confirmação de logout para o front        |
-| `/health/live`                         | 200 quando o processo HTTP responde       |
-| `/health/ready`                        | Sempre 503 até a entrega da issue #15     |
+| Rota                                  | Uso                                       |
+| ------------------------------------- | ----------------------------------------- |
+| `/.well-known/openid-configuration`   | Discovery                                 |
+| `/jwks`, `/authorize`, `/token`       | Protocolo OIDC                            |
+| `/token/revocation`, `/session/end`   | Revogação e logout                        |
+| `/interaction/:uid/{details,login,…}` | Login e recuperação de senha para o front |
+| `/session/logout-details`             | Confirmação de logout para o front        |
+| `/health/live`                        | 200 quando o processo HTTP responde       |
+| `/health/ready`                       | Sempre 503 até a entrega da issue #15     |
 
 A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias desde o login.
 

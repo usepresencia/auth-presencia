@@ -6,7 +6,6 @@ const PROVIDER_PATHS = [
     '/jwks',
     '/authorize',
     '/token',
-    '/me',
     '/session',
 ];
 

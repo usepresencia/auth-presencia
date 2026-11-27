@@ -47,6 +47,14 @@ describe('authorization code flow', () => {
         assert.equal(discovery.dpop_signing_alg_values_supported, undefined);
     });
 
+    it('does not offer userinfo, which would refuse every token of this service', async () => {
+        const discovery = await json('/.well-known/openid-configuration');
+        assert.equal(discovery.userinfo_endpoint, undefined);
+        assert.equal(discovery.userinfo_signing_alg_values_supported, undefined);
+        const response = await fetch(env.issuer + '/me');
+        assert.equal(response.status, 404);
+    });
+
     it('logs only the error name when a request fails outside the protocol routes', async () => {
         const { provider } = await env.secondInstance();
         provider.use(() => {

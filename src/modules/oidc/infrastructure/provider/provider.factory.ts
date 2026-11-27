@@ -66,6 +66,7 @@ export function createProvider(
         },
         features: {
             devInteractions: { enabled: false },
+            userinfo: { enabled: false },
             pushedAuthorizationRequests: { enabled: false },
             dPoP: { enabled: false },
             revocation: { enabled: true },
