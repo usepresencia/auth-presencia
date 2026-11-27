@@ -3,7 +3,6 @@ import { redirectSchema } from './redirect-uri';
 
 const OIDC_SCOPES = ['openid', 'email', 'profile', 'offline_access'];
 
-/** Claims definidas pelo protocolo ou pelo próprio auth. */
 const RESERVED_CLAIMS = [
     'acr',
     'amr',
@@ -57,7 +56,6 @@ const clientSchema = z.strictObject({
 
 export type ClientConfig = z.infer<typeof clientSchema>;
 
-/** Regras entre clients. As mensagens nunca incluem os valores recebidos. */
 export const clientsSchema = z
     .array(clientSchema)
     .min(1)
