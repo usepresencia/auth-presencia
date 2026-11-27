@@ -33,7 +33,7 @@ jobs:
               env:
                   NEW_TAG: ${{ github.sha }}
                   REGISTRY_USER: ${{ github.actor }}
-                  REGISTRY_TOKEN: ${{ secrets.GHCR_TOKEN }}
+                  REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   host: ${{ secrets.VPS_HOST }}
                   username: ${{ secrets.VPS_USER }}
@@ -41,32 +41,31 @@ jobs:
                   envs: NEW_TAG,REGISTRY_USER,REGISTRY_TOKEN
                   script: |
                       set -e
-                      cd /srv/auth
-                      SERVICE=auth-presencia
-                      ENV_FILE=.env.auth-presencia
+                      cd /srv/auth/
+                      SERVICE="auth-presencia"
+                      ENV_FILE=".env"
 
                       echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
 
                       cp "$ENV_FILE" "$ENV_FILE.bak"
                       sed -i "s/^AUTH_PRESENCIA_TAG=.*/AUTH_PRESENCIA_TAG=$NEW_TAG/" "$ENV_FILE"
-                      compose() { docker compose --env-file "$ENV_FILE" "$@"; }
 
                       restore() {
                           mv "$ENV_FILE.bak" "$ENV_FILE"
-                          compose up -d --force-recreate "$SERVICE"
+                          docker compose up -d --force-recreate "$SERVICE"
                       }
 
-                      if ! compose pull "$SERVICE"; then
+                      if ! docker compose pull "$SERVICE"; then
                           mv "$ENV_FILE.bak" "$ENV_FILE"
                           echo "Imagem indisponível; o serviço em execução não foi alterado."
                           exit 1
                       fi
-                      if ! compose run --rm "$SERVICE" npm run db:migrate; then
+                      if ! docker compose run --rm "$SERVICE" npm run db:migrate; then
                           mv "$ENV_FILE.bak" "$ENV_FILE"
                           echo "Migration falhou; o serviço em execução não foi alterado."
                           exit 1
                       fi
-                      if ! compose up -d --force-recreate "$SERVICE"; then
+                      if ! docker compose up -d --force-recreate "$SERVICE"; then
                           restore
                           exit 1
                       fi

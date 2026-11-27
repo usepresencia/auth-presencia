@@ -18,7 +18,7 @@ import { FIREBASE_GATEWAY, type FirebaseGateway } from './model/firebase.gateway
                     pickConfig(
                         config,
                         'FIREBASE_PROJECT_ID',
-                        'FIREBASE_API_KEY',
+                        'FIREBASE_WEB_API_KEY',
                         'FIREBASE_CLIENT_EMAIL',
                         'FIREBASE_PRIVATE_KEY',
                         'FIREBASE_AUTH_EMULATOR_HOST',

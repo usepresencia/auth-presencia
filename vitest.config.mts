@@ -21,7 +21,7 @@ export default defineConfig({
                 kontalClient('http://localhost:3341/callback', 'http://localhost:3341'),
             ]),
             FIREBASE_PROJECT_ID: 'demo-presencia',
-            FIREBASE_API_KEY: 'fake-api-key',
+            FIREBASE_WEB_API_KEY: 'fake-api-key',
         },
     },
 });

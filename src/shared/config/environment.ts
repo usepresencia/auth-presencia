@@ -86,7 +86,7 @@ const environmentSchema = z
             .default('false')
             .transform(value => value === 'true'),
         FIREBASE_PROJECT_ID: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
-        FIREBASE_API_KEY: z.string().min(1),
+        FIREBASE_WEB_API_KEY: z.string().min(1),
         FIREBASE_CLIENT_EMAIL: z.email().optional(),
         FIREBASE_PRIVATE_KEY: z.string().min(1).optional(),
         FIREBASE_AUTH_EMULATOR_HOST: emulatorHost,

@@ -82,7 +82,7 @@ export async function buildTestApp({ gateway = fakeGateway(), settings = {} } = 
         AUTH_COOKIE_KEYS: secret(),
         AUTH_CLIENTS: JSON.stringify([client]),
         FIREBASE_PROJECT_ID: 'demo-presencia',
-        FIREBASE_API_KEY: 'fake-api-key',
+        FIREBASE_WEB_API_KEY: 'fake-api-key',
         ...settings,
     });
     const dist = '../../../dist/';

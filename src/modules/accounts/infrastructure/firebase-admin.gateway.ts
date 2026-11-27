@@ -14,7 +14,7 @@ export type FirebaseSettings = Pick<
     | 'FIREBASE_PRIVATE_KEY'
     | 'FIREBASE_AUTH_EMULATOR_HOST'
 > &
-    Partial<Pick<Environment, 'FIREBASE_API_KEY'>>;
+    Partial<Pick<Environment, 'FIREBASE_WEB_API_KEY'>>;
 
 export interface FirebaseOverrides {
     fetch?: typeof fetch;
@@ -58,7 +58,7 @@ export class FirebaseAdminGateway implements FirebaseGateway, OnModuleDestroy {
     ) {
         const projectId = settings.FIREBASE_PROJECT_ID;
         this.projectId = projectId;
-        this.apiKey = settings.FIREBASE_API_KEY ?? '';
+        this.apiKey = settings.FIREBASE_WEB_API_KEY ?? '';
         const emulator =
             settings.FIREBASE_AUTH_EMULATOR_HOST ?? process.env.FIREBASE_AUTH_EMULATOR_HOST;
         this.toolkitUrl = emulator
