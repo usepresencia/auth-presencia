@@ -10,12 +10,6 @@ const position = text => {
 };
 
 describe('deploy workflow', () => {
-    it('runs only when started by hand, from main', () => {
-        assert.match(workflow, /^on:\n {4}workflow_dispatch:\n/m);
-        assert.doesNotMatch(workflow, /^ {4}(push|workflow_run|schedule|pull_request):/m);
-        position("if: github.ref == 'refs/heads/main'");
-    });
-
     const last = text => (position(text), workflow.lastIndexOf(text));
 
     it('leaves migrations to the container entrypoint', () => {

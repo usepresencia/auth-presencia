@@ -51,7 +51,7 @@ A tabela `auth_audit_events` registra login, falha de login (com o motivo), pedi
 
 ## Deploy
 
-O workflow **CD** é acionado manualmente a partir de `main`: publica a imagem, substitui o serviço na VPS (que aplica as migrations pendentes ao iniciar), confere `https://auth.presencia.com.br/health/ready` e volta à versão anterior se falhar. Migrations não são desfeitas na volta.
+Ao receber um push, a `main` passa pelo workflow **CI**, que depois dos checks gera a versão, o `CHANGELOG.md` e a tag. Quando esse CI termina com sucesso, o **CD** publica sozinho o commit validado: constrói a imagem, substitui o serviço na VPS (que aplica as migrations pendentes ao iniciar), confere `https://auth.presencia.com.br/health/ready` e volta à versão anterior se falhar. Migrations não são desfeitas na volta.
 
 Preparação única no servidor e no GitHub:
 

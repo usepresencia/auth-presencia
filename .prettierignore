@@ -4,3 +4,4 @@ coverage
 package-lock.json
 docs/api/
 .superpowers
+CHANGELOG.md

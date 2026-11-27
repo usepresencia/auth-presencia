@@ -53,3 +53,30 @@ jobs:
               env:
                   INTEGRATION_DATABASE_URL: postgresql://auth_test:local-fixture-only@127.0.0.1:5432/presencia_auth_test
             - run: npm run docs
+
+    release:
+        name: Release
+        runs-on: ubuntu-latest
+        needs: build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        permissions:
+            contents: write
+        concurrency:
+            group: release-auth-presencia
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+            - run: npm ci
+            - name: Configure Git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+            - name: Release
+              run: |
+                  npm run release
+                  git push --follow-tags origin main
