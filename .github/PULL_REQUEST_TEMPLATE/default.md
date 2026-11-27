@@ -2,6 +2,12 @@
 
 ## 🔗 Tarefa/Ticket Relacionado
 
+Closes #NUMERO
+
+<!-- Um PR por issue finalizada. Substitua NUMERO pela única issue concluída.
+Em outro repositório, use Closes usepresencia/auth-presencia#NUMERO e configure a integração de fechamento autorizada.
+O fechamento acontece somente após merge pelo mantenedor. -->
+
 ## 🏷️ Tipo de Mudança
 
 - [ ] ✨ Nova funcionalidade

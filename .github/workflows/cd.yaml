@@ -1,18 +1,28 @@
 name: CD
 
 on:
-    workflow_dispatch:
+    workflow_run:
+        workflows: ['CI']
+        branches: [main]
+        types: [completed]
 
 permissions:
     contents: read
     packages: write
 
+concurrency:
+    group: deploy-auth-presencia
+
 jobs:
-    image:
-        if: github.ref == 'refs/heads/main'
+    deploy:
+        if: >-
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.event == 'push'
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.workflow_run.head_sha }}
             - uses: docker/setup-buildx-action@v3
             - uses: docker/login-action@v3
               with:
@@ -24,4 +34,55 @@ jobs:
               with:
                   context: .
                   push: true
-                  tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+                  tags: ghcr.io/${{ github.repository }}:${{ github.event.workflow_run.head_sha }}
+            - name: Deploy on the VPS
+              uses: appleboy/ssh-action@v1.2.0
+              env:
+                  NEW_TAG: ${{ github.event.workflow_run.head_sha }}
+                  REGISTRY_USER: ${{ github.actor }}
+                  REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  host: ${{ secrets.VPS_HOST }}
+                  username: ${{ secrets.VPS_USER }}
+                  key: ${{ secrets.VPS_SSH_KEY }}
+                  envs: NEW_TAG,REGISTRY_USER,REGISTRY_TOKEN
+                  script: |
+                      set -e
+                      cd /srv/auth/
+                      SERVICE="auth-presencia"
+                      ENV_FILE=".env.auth-presencia"
+
+                      echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+
+                      cp "$ENV_FILE" "$ENV_FILE.bak"
+                      sed -i "s/^AUTH_PRESENCIA_TAG=.*/AUTH_PRESENCIA_TAG=$NEW_TAG/" "$ENV_FILE"
+
+                      compose() { docker compose --env-file "$ENV_FILE" "$@"; }
+
+                      restore() {
+                          mv "$ENV_FILE.bak" "$ENV_FILE"
+                          compose up -d --force-recreate "$SERVICE"
+                      }
+
+                      if ! compose pull "$SERVICE"; then
+                          mv "$ENV_FILE.bak" "$ENV_FILE"
+                          echo "Imagem indisponível; o serviço em execução não foi alterado."
+                          exit 1
+                      fi
+                      if ! compose up -d --force-recreate "$SERVICE"; then
+                          restore
+                          exit 1
+                      fi
+
+                      for attempt in $(seq 1 12); do
+                          if curl -fsS -o /dev/null https://auth.presencia.com.br/health/ready; then
+                              rm -f "$ENV_FILE.bak"
+                              echo "Deploy validado."
+                              exit 0
+                          fi
+                          sleep 5
+                      done
+
+                      echo "Readiness falhou; voltando para a versão anterior."
+                      restore
+                      exit 1

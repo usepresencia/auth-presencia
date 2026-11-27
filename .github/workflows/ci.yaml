@@ -13,6 +13,20 @@ jobs:
     build:
         name: Validate, Lint, Test, Build (NestJS)
         runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:17-alpine
+                env:
+                    POSTGRES_USER: auth_test
+                    POSTGRES_PASSWORD: local-fixture-only
+                    POSTGRES_DB: presencia_auth_test
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U auth_test -d presencia_auth_test"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 10
         steps:
             - uses: actions/checkout@v4
               with:
@@ -22,6 +36,7 @@ jobs:
                   node-version-file: .nvmrc
                   cache: npm
             - run: npm ci
+            - run: npm run prisma:generate
             - name: Validate commit messages
               if: github.event_name == 'pull_request'
               env:
@@ -31,6 +46,37 @@ jobs:
             - run: npm run format:check
             - run: npm run lint
             - run: npm run typecheck
+            - run: node --test test/workflows/*.spec.cjs
             - run: npm run test:coverage
             - run: npm run build
+            - run: npx --no-install firebase emulators:exec --only auth,firestore --project demo-presencia 'npm run test:integration'
+              env:
+                  INTEGRATION_DATABASE_URL: postgresql://auth_test:local-fixture-only@127.0.0.1:5432/presencia_auth_test
             - run: npm run docs
+
+    release:
+        name: Release
+        runs-on: ubuntu-latest
+        needs: build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        permissions:
+            contents: write
+        concurrency:
+            group: release-auth-presencia
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+            - run: npm ci
+            - name: Configure Git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+            - name: Release
+              run: |
+                  npm run release
+                  git push --follow-tags origin main

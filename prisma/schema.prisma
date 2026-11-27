@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Identity {
+  id            String             @id @db.Uuid
+  status        String             @default("active")
+  email         String?
+  emailVerified Boolean            @default(false) @map("email_verified")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  firebaseLinks FirebaseIdentity[]
+
+  @@map("auth_identities")
+}
+
+model FirebaseIdentity {
+  firebaseProjectId String   @map("firebase_project_id")
+  firebaseUid       String   @map("firebase_uid")
+  identityId        String   @map("identity_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  identity          Identity @relation(fields: [identityId], references: [id], onDelete: Restrict)
+
+  @@id([firebaseProjectId, firebaseUid])
+  @@index([identityId], map: "auth_firebase_identities_identity_idx")
+  @@map("auth_firebase_identities")
+}
+
+model OidcArtifact {
+  model      String
+  id         String
+  payload    Json
+  grantId    String?   @map("grant_id")
+  uid        String?
+  userCode   String?   @map("user_code")
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+
+  @@id([model, id])
+  @@index([grantId])
+  @@index([uid])
+  @@index([userCode])
+  @@index([model, expiresAt])
+  @@map("auth_oidc_artifacts")
+}
+
+model RateLimit {
+  key          String    @id
+  count        Int
+  windowStart  DateTime  @map("window_start") @db.Timestamptz(6)
+  blockedUntil DateTime? @map("blocked_until") @db.Timestamptz(6)
+  strikes      Int
+  updatedAt    DateTime  @map("updated_at") @db.Timestamptz(6)
+
+  @@index([updatedAt])
+  @@map("auth_rate_limits")
+}
+
+model AuditEvent {
+  id            String   @id @db.Uuid
+  type          String
+  occurredAt    DateTime @map("occurred_at") @db.Timestamptz(6)
+  identityId    String?  @map("identity_id") @db.Uuid
+  clientId      String?  @map("client_id")
+  correlationId String?  @map("correlation_id")
+  reason        String?
+  emailHash     String?  @map("email_hash")
+  addressHash   String?  @map("address_hash")
+
+  @@index([occurredAt])
+  @@index([identityId, occurredAt])
+  @@map("auth_audit_events")
+}
