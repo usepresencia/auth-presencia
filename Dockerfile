@@ -29,6 +29,8 @@ COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node prisma ./prisma
 COPY --chown=node:node prisma.config.ts ./
 COPY --chown=node:node package.json ./
+COPY --chown=node:node --chmod=755 entrypoint.sh ./
 USER node
 EXPOSE 3340
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["node", "dist/main.js"]

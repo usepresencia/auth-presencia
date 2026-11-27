@@ -18,8 +18,8 @@ describe('deploy workflow', () => {
 
     const last = text => (position(text), workflow.lastIndexOf(text));
 
-    it('migrates the database before replacing the service', () => {
-        assert.ok(position('npm run db:migrate') < last('docker compose up -d'));
+    it('leaves migrations to the container entrypoint', () => {
+        assert.doesNotMatch(workflow, /db:migrate|migrate deploy/);
     });
 
     it('checks readiness and restores the previous version on failure', () => {

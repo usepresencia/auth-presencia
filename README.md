@@ -51,7 +51,7 @@ A tabela `auth_audit_events` registra login, falha de login (com o motivo), pedi
 
 ## Deploy
 
-O workflow **CD** é acionado manualmente a partir de `main`: publica a imagem, aplica as migrations, substitui o serviço na VPS, confere `https://auth.presencia.com.br/health/ready` e volta à versão anterior se falhar. Migrations não são desfeitas na volta.
+O workflow **CD** é acionado manualmente a partir de `main`: publica a imagem, substitui o serviço na VPS (que aplica as migrations pendentes ao iniciar), confere `https://auth.presencia.com.br/health/ready` e volta à versão anterior se falhar. Migrations não são desfeitas na volta.
 
 Preparação única no servidor e no GitHub:
 
@@ -139,7 +139,7 @@ docker build -t auth-presencia .
 docker run --rm -p 3340:3340 --env-file .env.container auth-presencia
 ```
 
-O .env.container (não versionado) precisa das variáveis do .env.example, com valores de produção e sem aspas. Aplique as migrations com `npm run db:migrate`; a API não as executa ao iniciar.
+O .env.container (não versionado) precisa das variáveis do .env.example, com valores de produção e sem aspas. Ao iniciar, o contêiner aplica as migrations pendentes (`prisma migrate deploy`) e só então sobe a API; se uma migration falhar, a API não sobe.
 
 ## Segurança
 

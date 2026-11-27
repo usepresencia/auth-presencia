@@ -60,11 +60,6 @@ jobs:
                           echo "Imagem indisponível; o serviço em execução não foi alterado."
                           exit 1
                       fi
-                      if ! docker compose run --rm "$SERVICE" npm run db:migrate; then
-                          mv "$ENV_FILE.bak" "$ENV_FILE"
-                          echo "Migration falhou; o serviço em execução não foi alterado."
-                          exit 1
-                      fi
                       if ! docker compose up -d --force-recreate "$SERVICE"; then
                           restore
                           exit 1
