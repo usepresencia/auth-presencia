@@ -37,6 +37,22 @@ A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias
 
 **Ainda não publicar em produção:** não há limite de tentativas de login nem readiness (#15).
 
+## Cadastrar um produto
+
+Cada produto é um item de `AUTH_CLIENTS`. Alterações valem após reiniciar a API.
+
+| Campo                    | Regra                                                                |
+| ------------------------ | -------------------------------------------------------------------- |
+| `clientId`               | Único; letras minúsculas, números e hífen                            |
+| `clientSecret`           | Mínimo de 32 caracteres, diferente em cada client                    |
+| `redirectUris`           | Endereços exatos de retorno, HTTPS (HTTP só em loopback)             |
+| `postLogoutRedirectUris` | Endereços exatos para depois do logout                               |
+| `resource`, `audience`   | Identificam a API; um par por API, e `audience` não repete um client |
+| `scope`                  | Escopos da API, separados por espaço, sem os escopos OIDC            |
+| `firebaseClaims`         | Claims customizadas que o produto recebe; as padrão são reservadas   |
+
+Gere o segredo com `node scripts/generate-keys.mjs`. O auth não guarda quem pode acessar cada produto: isso é responsabilidade da API dele.
+
 ## Erros
 
 Rotas próprias respondem `statusCode`, `code`, `message`, `error` e `correlationId`; as rotas do protocolo seguem o formato do OAuth. Falhas 5xx são gravadas em `logs/{correlationId}/entries` no Firestore, lidas pela tela de Logs do web-admin-console, sem a mensagem original do erro. O header `x-correlation-id` é aceito e devolvido.
