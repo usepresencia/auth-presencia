@@ -57,10 +57,12 @@ Preparação única no servidor e no GitHub:
 
 1. Segredos `VPS_HOST`, `VPS_USER` e `VPS_SSH_KEY`.
 2. DNS e certificado de `auth.presencia.com.br`.
-3. Em `/srv/auth`, no mesmo formato dos demais produtos:
+3. Em `/srv/auth`:
     - `docker-compose.yml` com o serviço `auth-presencia` (imagem `ghcr.io/usepresencia/auth-presencia:${AUTH_PRESENCIA_TAG}`, porta 3340, rede externa `public_presencia`, certresolver `le`) e o Postgres em rede interna;
-    - `.env` com `AUTH_PRESENCIA_TAG`, `API_DOMAIN`, `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB`;
-    - `.env.auth-presencia` com as variáveis de .env.example, com leitura restrita.
+    - `.env.auth-presencia`, o único arquivo de ambiente, com as variáveis de .env.example mais `AUTH_PRESENCIA_TAG`, `API_DOMAIN`, `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB`, com leitura restrita.
+
+    Todo comando manual precisa de `docker compose --env-file .env.auth-presencia`.
+
 4. No Traefik global, a API recebe somente `/.well-known`, `/jwks`, `/authorize`, `/token`, `/session`, `/health` e `/interaction/{uid}/...`; `/interaction/{uid}`, `/logout`, `/logout/success` e `/error` ficam para o front. O Traefik não deve confiar em `X-Forwarded-*` vindos da internet, pois os limites dependem do endereço real.
 5. Backups do banco, métricas e alertas.
 

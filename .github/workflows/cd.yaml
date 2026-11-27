@@ -43,24 +43,26 @@ jobs:
                       set -e
                       cd /srv/auth/
                       SERVICE="auth-presencia"
-                      ENV_FILE=".env"
+                      ENV_FILE=".env.auth-presencia"
 
                       echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
 
                       cp "$ENV_FILE" "$ENV_FILE.bak"
                       sed -i "s/^AUTH_PRESENCIA_TAG=.*/AUTH_PRESENCIA_TAG=$NEW_TAG/" "$ENV_FILE"
 
+                      compose() { docker compose --env-file "$ENV_FILE" "$@"; }
+
                       restore() {
                           mv "$ENV_FILE.bak" "$ENV_FILE"
-                          docker compose up -d --force-recreate "$SERVICE"
+                          compose up -d --force-recreate "$SERVICE"
                       }
 
-                      if ! docker compose pull "$SERVICE"; then
+                      if ! compose pull "$SERVICE"; then
                           mv "$ENV_FILE.bak" "$ENV_FILE"
                           echo "Imagem indisponível; o serviço em execução não foi alterado."
                           exit 1
                       fi
-                      if ! docker compose up -d --force-recreate "$SERVICE"; then
+                      if ! compose up -d --force-recreate "$SERVICE"; then
                           restore
                           exit 1
                       fi
