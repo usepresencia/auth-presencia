@@ -45,6 +45,10 @@ A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias
 
 Exceder bloqueia por 1, 5, 15 e depois 60 minutos; um dia sem tentativas zera a reincidência. A resposta é 429 com `Retry-After`. O estado fica no Postgres, compartilhado entre réplicas, com e-mails e endereços gravados somente como hash. O endereço vem do proxy confiável (`AUTH_TRUST_PROXY=true`, um único proxy à frente).
 
+## Auditoria
+
+A tabela `auth_audit_events` registra login, falha de login (com o motivo), pedido de recuperação de senha, logout e reuso de token ou código, com pessoa, client e correlation id quando conhecidos (no reuso de authorization code a pessoa não é identificada). E-mail e endereço são gravados somente como hash, e nenhum token é gravado. Eventos com mais de 90 dias são removidos. A falha ao auditar não interrompe o login.
+
 ## Deploy
 
 O workflow **CD** é acionado manualmente a partir de `main`: publica a imagem, aplica as migrations, substitui o serviço na VPS, confere `https://auth.presencia.com.br/health/ready` e volta à versão anterior se falhar. Migrations não são desfeitas na volta.

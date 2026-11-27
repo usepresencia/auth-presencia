@@ -12,8 +12,9 @@ import {
 import type { Request, Response } from 'express';
 import Provider, { errors, type InteractionResults } from 'oidc-provider';
 import { z } from 'zod';
+import { CORRELATION_HEADER, resolveCorrelationId } from '../../errors/model/correlation-id';
 import { AppError } from '../../errors/model/app.error';
-import { LoginService } from '../application/login.service';
+import { LoginService, type LoginOrigin } from '../application/login.service';
 import { SignInError } from '../../accounts/model/sign-in.error';
 import { OIDC_PROVIDER } from '../oidc.tokens';
 import { loginSchema, passwordResetSchema } from './interaction.schemas';
@@ -25,7 +26,15 @@ function parseBody<T>(schema: z.ZodType<T>, request: Request): T {
     return result.data;
 }
 
-const addressOf = (request: Request) => request.ip ?? 'unknown';
+const originOf = (
+    interaction: { uid: string; params: Record<string, unknown> },
+    request: Request,
+): LoginOrigin => ({
+    interactionUid: interaction.uid,
+    clientId: String(interaction.params['client_id']),
+    correlationId: resolveCorrelationId(request.headers[CORRELATION_HEADER]),
+    address: request.ip ?? 'unknown',
+});
 
 async function guarded<T>(operation: () => Promise<T>): Promise<T> {
     try {
@@ -72,10 +81,9 @@ export class InteractionController {
             const interaction = await this.pending(uid, request, response);
             if (interaction.result?.login) return { redirectTo: interaction.returnTo };
             const accountId = await this.logins.signIn(
-                uid,
                 body.email,
                 body.password,
-                addressOf(request),
+                originOf(interaction, request),
             );
             return this.finish(request, response, { login: { accountId, remember: true } });
         });
@@ -90,8 +98,8 @@ export class InteractionController {
     ): Promise<void> {
         return guarded(async () => {
             const body = parseBody(passwordResetSchema, request);
-            await this.pending(uid, request, response);
-            await this.logins.sendPasswordReset(body.email, addressOf(request));
+            const interaction = await this.pending(uid, request, response);
+            await this.logins.sendPasswordReset(body.email, originOf(interaction, request));
         });
     }
 
