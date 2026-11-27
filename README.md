@@ -53,8 +53,8 @@ Preparação única no servidor e no GitHub:
 
 1. Segredos `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` e `GHCR_TOKEN`.
 2. DNS e certificado de `auth.presencia.com.br`.
-3. Em `/srv/presencia`, o serviço de `deploy/auth-presencia.compose.yaml` no compose, um banco Postgres dedicado e o arquivo `.env.auth-presencia` com leitura restrita.
-4. O Traefik termina o TLS e envia à API somente os caminhos das labels do serviço; `/interaction/{uid}`, `/logout`, `/logout/success` e `/error` ficam para o front, que declara um roteador para o mesmo host. Confira o nome do entrypoint, do certresolver e da rede com os dos outros serviços. O Traefik não deve confiar em `X-Forwarded-*` vindos da internet (não use `forwardedHeaders.insecure`), pois os limites dependem do endereço real.
+3. Em `/srv/auth`, o `docker-compose.yml` com o serviço `auth-presencia` (imagem `ghcr.io/usepresencia/auth-presencia:${AUTH_PRESENCIA_TAG}`, porta 3340, rede do Traefik), um banco Postgres dedicado e o arquivo `.env.auth-presencia`, com as variáveis de .env.example, `AUTH_PRESENCIA_TAG` e leitura restrita.
+4. No Traefik global, a API recebe somente `/.well-known`, `/jwks`, `/authorize`, `/token`, `/session`, `/health` e `/interaction/{uid}/...`; `/interaction/{uid}`, `/logout`, `/logout/success` e `/error` ficam para o front. O Traefik não deve confiar em `X-Forwarded-*` vindos da internet, pois os limites dependem do endereço real.
 5. Backups do banco, métricas e alertas.
 
 ## Cadastrar um produto

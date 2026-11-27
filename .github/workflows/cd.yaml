@@ -41,7 +41,7 @@ jobs:
                   envs: NEW_TAG,REGISTRY_USER,REGISTRY_TOKEN
                   script: |
                       set -e
-                      cd /srv/presencia
+                      cd /srv/auth
                       SERVICE=auth-presencia
                       ENV_FILE=.env.auth-presencia
 
@@ -49,26 +49,24 @@ jobs:
 
                       cp "$ENV_FILE" "$ENV_FILE.bak"
                       sed -i "s/^AUTH_PRESENCIA_TAG=.*/AUTH_PRESENCIA_TAG=$NEW_TAG/" "$ENV_FILE"
-                      load_env() { export AUTH_PRESENCIA_TAG="$(grep '^AUTH_PRESENCIA_TAG=' "$ENV_FILE" | cut -d '=' -f2)"; }
-                      load_env
+                      compose() { docker compose --env-file "$ENV_FILE" "$@"; }
 
                       restore() {
                           mv "$ENV_FILE.bak" "$ENV_FILE"
-                          load_env
-                          docker compose up -d --force-recreate "$SERVICE"
+                          compose up -d --force-recreate "$SERVICE"
                       }
 
-                      if ! docker compose pull "$SERVICE"; then
+                      if ! compose pull "$SERVICE"; then
                           mv "$ENV_FILE.bak" "$ENV_FILE"
                           echo "Imagem indisponível; o serviço em execução não foi alterado."
                           exit 1
                       fi
-                      if ! docker compose run --rm "$SERVICE" npm run db:migrate; then
+                      if ! compose run --rm "$SERVICE" npm run db:migrate; then
                           mv "$ENV_FILE.bak" "$ENV_FILE"
                           echo "Migration falhou; o serviço em execução não foi alterado."
                           exit 1
                       fi
-                      if ! docker compose up -d --force-recreate "$SERVICE"; then
+                      if ! compose up -d --force-recreate "$SERVICE"; then
                           restore
                           exit 1
                       fi
