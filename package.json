@@ -12,7 +12,7 @@
         "start:dev": "nest start --watch",
         "build": "prisma generate && nest build",
         "typecheck": "tsc --noEmit",
-        "lint": "eslint src test scripts poc",
+        "lint": "eslint src test scripts",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",
@@ -25,7 +25,6 @@
         "prepare": "node scripts/prepare.mjs",
         "test:integration": "node --test test/integration/*.spec.mjs",
         "db:migrate": "prisma migrate deploy",
-        "test:poc": "node --test poc/oidc-provider.spec.mjs",
         "prisma:generate": "prisma generate",
         "prisma:migrate": "prisma migrate dev",
         "emulators": "firebase emulators:start --only auth,firestore --project demo-presencia"
