@@ -18,8 +18,8 @@ describe('deploy workflow', () => {
 
     const last = text => (position(text), workflow.lastIndexOf(text));
 
-    it('migrates the database before replacing the service', () => {
-        assert.ok(position('npm run db:migrate') < last('docker compose up -d'));
+    it('leaves migrations to the container entrypoint', () => {
+        assert.doesNotMatch(workflow, /db:migrate|migrate deploy/);
     });
 
     it('checks readiness and restores the previous version on failure', () => {
@@ -27,15 +27,16 @@ describe('deploy workflow', () => {
     });
 
     it('keeps the previous tag when the new image cannot be pulled or started', () => {
-        position('if ! docker compose pull "$SERVICE"; then');
-        position('if ! docker compose up -d --force-recreate "$SERVICE"; then');
+        position('if ! compose pull "$SERVICE"; then');
+        position('if ! compose up -d --force-recreate "$SERVICE"; then');
     });
 
-    it('follows the layout of the products with their own folder on the server', () => {
+    it('uses the single env file of the service, in /srv/auth', () => {
         position('cd /srv/auth/\n');
         position('SERVICE="auth-presencia"');
-        position('ENV_FILE=".env"\n');
+        position('ENV_FILE=".env.auth-presencia"\n');
         position('s/^AUTH_PRESENCIA_TAG=.*/AUTH_PRESENCIA_TAG=$NEW_TAG/');
-        assert.doesNotMatch(workflow, /--env-file/);
+        position('compose() { docker compose --env-file "$ENV_FILE" "$@"; }');
+        assert.doesNotMatch(workflow, /^ +(if ! )?docker compose (pull|up|run)/m);
     });
 });
