@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, before, beforeEach, describe, it } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { jwtClaims } from '../support/fixtures.mjs';
 import { buildTestApp, oauthClient } from './support/app.mjs';
@@ -16,6 +16,10 @@ before(async () => {
 });
 after(async () => {
     await env?.close();
+});
+
+beforeEach(async () => {
+    await env.database.prisma.rateLimit.deleteMany();
 });
 
 async function start(browser = new Browser()) {

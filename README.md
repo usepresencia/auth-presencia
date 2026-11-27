@@ -31,11 +31,34 @@ O serviço escuta em http://localhost:3340. AUTH_ISSUER é a origem pública est
 | `/interaction/:uid/{details,login,…}` | Login e recuperação de senha para o front |
 | `/session/logout-details`             | Confirmação de logout para o front        |
 | `/health/live`                        | 200 quando o processo HTTP responde       |
-| `/health/ready`                       | Sempre 503 até a entrega da issue #15     |
+| `/health/ready`                       | 200 com banco e migrations prontos        |
 
 A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias desde o login.
 
-**Ainda não publicar em produção:** não há limite de tentativas de login nem readiness (#15).
+## Proteções
+
+| Ação                 | Limite por 15 minutos                                   |
+| -------------------- | ------------------------------------------------------- |
+| Senha recusada       | 5 por e-mail e endereço, 20 por e-mail, 50 por endereço |
+| Recuperação de senha | 3 por e-mail, 10 por endereço                           |
+| Recusas em `/token`  | 30 por endereço                                         |
+
+Exceder bloqueia por 1, 5, 15 e depois 60 minutos; um dia sem tentativas zera a reincidência. A resposta é 429 com `Retry-After`. O estado fica no Postgres, compartilhado entre réplicas, com e-mails e endereços gravados somente como hash. O endereço vem do proxy confiável (`AUTH_TRUST_PROXY=true`, um único proxy à frente).
+
+## Deploy
+
+O workflow **CD** é acionado manualmente a partir de `main`: publica a imagem, aplica as migrations, substitui o serviço na VPS, confere `https://auth.presencia.com.br/health/ready` e volta à versão anterior se falhar. Migrations não são desfeitas na volta.
+
+Preparação única no servidor e no GitHub:
+
+1. Segredos `VPS_HOST`, `VPS_USER` e `VPS_SSH_KEY`.
+2. DNS e certificado de `auth.presencia.com.br`.
+3. Em `/srv/auth`, no mesmo formato dos demais produtos:
+    - `docker-compose.yml` com o serviço `auth-presencia` (imagem `ghcr.io/usepresencia/auth-presencia:${AUTH_PRESENCIA_TAG}`, porta 3340, rede externa `public_presencia`, certresolver `le`) e o Postgres em rede interna;
+    - `.env` com `AUTH_PRESENCIA_TAG`, `API_DOMAIN`, `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB`;
+    - `.env.auth-presencia` com as variáveis de .env.example, com leitura restrita.
+4. No Traefik global, a API recebe somente `/.well-known`, `/jwks`, `/authorize`, `/token`, `/session`, `/health` e `/interaction/{uid}/...`; `/interaction/{uid}`, `/logout`, `/logout/success` e `/error` ficam para o front. O Traefik não deve confiar em `X-Forwarded-*` vindos da internet, pois os limites dependem do endereço real.
+5. Backups do banco, métricas e alertas.
 
 ## Cadastrar um produto
 

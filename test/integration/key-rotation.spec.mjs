@@ -52,7 +52,7 @@ async function restart(next = keys) {
             DATABASE_URL: database.url,
             AUTH_CLIENTS: JSON.stringify([client]),
             FIREBASE_PROJECT_ID: 'demo-presencia',
-            FIREBASE_API_KEY: 'fake-api-key',
+            FIREBASE_WEB_API_KEY: 'fake-api-key',
         },
         stdio: 'ignore',
     });

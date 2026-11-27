@@ -46,3 +46,15 @@ model OidcArtifact {
   @@index([model, expiresAt])
   @@map("auth_oidc_artifacts")
 }
+
+model RateLimit {
+  key          String    @id
+  count        Int
+  windowStart  DateTime  @map("window_start") @db.Timestamptz(6)
+  blockedUntil DateTime? @map("blocked_until") @db.Timestamptz(6)
+  strikes      Int
+  updatedAt    DateTime  @map("updated_at") @db.Timestamptz(6)
+
+  @@index([updatedAt])
+  @@map("auth_rate_limits")
+}

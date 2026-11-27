@@ -9,7 +9,7 @@ const valid: Record<string, string> = Object.fromEntries(
         'AUTH_COOKIE_KEYS',
         'AUTH_CLIENTS',
         'FIREBASE_PROJECT_ID',
-        'FIREBASE_API_KEY',
+        'FIREBASE_WEB_API_KEY',
     ].map(name => [name, process.env[name] as string]),
 );
 const production = {
@@ -55,7 +55,7 @@ describe('environment validation', () => {
         'AUTH_COOKIE_KEYS',
         'AUTH_CLIENTS',
         'FIREBASE_PROJECT_ID',
-        'FIREBASE_API_KEY',
+        'FIREBASE_WEB_API_KEY',
     ])('requires %s', name => rejects({ [name]: undefined }, name));
 
     it('rejects a public-only signing key', () => {

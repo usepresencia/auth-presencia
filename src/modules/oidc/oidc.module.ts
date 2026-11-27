@@ -10,6 +10,8 @@ import { InteractionController } from './presentation/interaction.controller';
 import { OIDC_PROVIDER } from './oidc.tokens';
 import { RecordErrorService } from '../errors/application/record-error.service';
 import { ErrorsModule } from '../errors/errors.module';
+import { RateLimiterService } from '../protection/application/rate-limiter.service';
+import { ProtectionModule } from '../protection/protection.module';
 import { LoginService } from './application/login.service';
 import { createPrismaAdapter } from './infrastructure/prisma-oidc.adapter';
 import { LogoutController } from './presentation/logout.controller';
@@ -17,13 +19,14 @@ import { createProvider } from './infrastructure/provider/provider.factory';
 import { createSessionExtension } from './infrastructure/prisma-session.extension';
 
 @Module({
-    imports: [PersistenceModule, AccountsModule, ErrorsModule],
+    imports: [PersistenceModule, AccountsModule, ErrorsModule, ProtectionModule],
     controllers: [InteractionController, LogoutController],
     providers: [
         {
             provide: LoginService,
-            useFactory: (accounts: AccountService) => new LoginService(accounts),
-            inject: [AccountService],
+            useFactory: (accounts: AccountService, limiter: RateLimiterService) =>
+                new LoginService(accounts, limiter),
+            inject: [AccountService, RateLimiterService],
         },
         {
             provide: OIDC_PROVIDER,

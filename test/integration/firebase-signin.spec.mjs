@@ -11,7 +11,7 @@ let gateway;
 before(() => {
     fixtures = firebaseFixtures();
     gateway = new FirebaseAdminGateway(
-        { FIREBASE_PROJECT_ID: projectId, FIREBASE_API_KEY: 'fake-api-key' },
+        { FIREBASE_PROJECT_ID: projectId, FIREBASE_WEB_API_KEY: 'fake-api-key' },
         {
             fetch: (url, options) => {
                 urls.push(new URL(url));

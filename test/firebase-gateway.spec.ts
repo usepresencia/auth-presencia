@@ -9,7 +9,7 @@ const decoded = { uid: 'fb-1', email: 'person@example.test', email_verified: tru
 function gateway(status: number, body: unknown, verify = vi.fn(async () => decoded)) {
     const request = vi.fn(async () => new Response(JSON.stringify(body), { status }));
     const instance = new FirebaseAdminGateway(
-        { FIREBASE_PROJECT_ID: 'demo-presencia', FIREBASE_API_KEY: apiKey },
+        { FIREBASE_PROJECT_ID: 'demo-presencia', FIREBASE_WEB_API_KEY: apiKey },
         { fetch: request as unknown as typeof fetch, verifyIdToken: verify },
     );
     return { instance, request, verify };
@@ -78,7 +78,7 @@ describe('Firebase password sign-in', () => {
 
     it('never includes the password or API key in a thrown error', async () => {
         const network = new FirebaseAdminGateway(
-            { FIREBASE_PROJECT_ID: 'demo-presencia', FIREBASE_API_KEY: apiKey },
+            { FIREBASE_PROJECT_ID: 'demo-presencia', FIREBASE_WEB_API_KEY: apiKey },
             {
                 fetch: async url => {
                     throw new Error('failed ' + String(url) + ' ' + password);
