@@ -36,7 +36,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         const http = host.switchToHttp();
         const request = http.getRequest<Request>();
         const { code, status } = classify(exception);
-        const correlationId = sendError(request, http.getResponse<Response>(), code, status);
+        const response = http.getResponse<Response>();
+        if (exception instanceof AppError && exception.retryAfterSeconds) {
+            response.setHeader('retry-after', String(exception.retryAfterSeconds));
+        }
+        const correlationId = sendError(request, response, code, status);
         if (status < 500 || errorDefinition(code).record === false) return;
 
         const cause = exception instanceof AppError ? (exception.cause ?? exception) : exception;

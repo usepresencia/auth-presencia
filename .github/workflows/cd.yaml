@@ -7,8 +7,11 @@ permissions:
     contents: read
     packages: write
 
+concurrency:
+    group: deploy-auth-presencia
+
 jobs:
-    image:
+    deploy:
         if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         steps:
@@ -25,3 +28,60 @@ jobs:
                   context: .
                   push: true
                   tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+            - name: Deploy on the VPS
+              uses: appleboy/ssh-action@v1.2.0
+              env:
+                  NEW_TAG: ${{ github.sha }}
+                  REGISTRY_USER: ${{ github.actor }}
+                  REGISTRY_TOKEN: ${{ secrets.GHCR_TOKEN }}
+              with:
+                  host: ${{ secrets.VPS_HOST }}
+                  username: ${{ secrets.VPS_USER }}
+                  key: ${{ secrets.VPS_SSH_KEY }}
+                  envs: NEW_TAG,REGISTRY_USER,REGISTRY_TOKEN
+                  script: |
+                      set -e
+                      cd /srv/presencia
+                      SERVICE=auth-presencia
+                      ENV_FILE=.env.auth-presencia
+
+                      echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+
+                      cp "$ENV_FILE" "$ENV_FILE.bak"
+                      sed -i "s/^AUTH_PRESENCIA_TAG=.*/AUTH_PRESENCIA_TAG=$NEW_TAG/" "$ENV_FILE"
+                      load_env() { export AUTH_PRESENCIA_TAG="$(grep '^AUTH_PRESENCIA_TAG=' "$ENV_FILE" | cut -d '=' -f2)"; }
+                      load_env
+
+                      restore() {
+                          mv "$ENV_FILE.bak" "$ENV_FILE"
+                          load_env
+                          docker compose up -d --force-recreate "$SERVICE"
+                      }
+
+                      if ! docker compose pull "$SERVICE"; then
+                          mv "$ENV_FILE.bak" "$ENV_FILE"
+                          echo "Imagem indisponível; o serviço em execução não foi alterado."
+                          exit 1
+                      fi
+                      if ! docker compose run --rm "$SERVICE" npm run db:migrate; then
+                          mv "$ENV_FILE.bak" "$ENV_FILE"
+                          echo "Migration falhou; o serviço em execução não foi alterado."
+                          exit 1
+                      fi
+                      if ! docker compose up -d --force-recreate "$SERVICE"; then
+                          restore
+                          exit 1
+                      fi
+
+                      for attempt in $(seq 1 12); do
+                          if curl -fsS -o /dev/null https://auth.presencia.com.br/health/ready; then
+                              rm -f "$ENV_FILE.bak"
+                              echo "Deploy validado."
+                              exit 0
+                          fi
+                          sleep 5
+                      done
+
+                      echo "Readiness falhou; voltando para a versão anterior."
+                      restore
+                      exit 1

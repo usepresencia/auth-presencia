@@ -25,6 +25,8 @@ function parseBody<T>(schema: z.ZodType<T>, request: Request): T {
     return result.data;
 }
 
+const addressOf = (request: Request) => request.ip ?? 'unknown';
+
 async function guarded<T>(operation: () => Promise<T>): Promise<T> {
     try {
         return await operation();
@@ -69,7 +71,12 @@ export class InteractionController {
             const body = parseBody(loginSchema, request);
             const interaction = await this.pending(uid, request, response);
             if (interaction.result?.login) return { redirectTo: interaction.returnTo };
-            const accountId = await this.logins.signIn(uid, body.email, body.password);
+            const accountId = await this.logins.signIn(
+                uid,
+                body.email,
+                body.password,
+                addressOf(request),
+            );
             return this.finish(request, response, { login: { accountId, remember: true } });
         });
     }
@@ -84,7 +91,7 @@ export class InteractionController {
         return guarded(async () => {
             const body = parseBody(passwordResetSchema, request);
             await this.pending(uid, request, response);
-            await this.logins.sendPasswordReset(body.email);
+            await this.logins.sendPasswordReset(body.email, addressOf(request));
         });
     }
 

@@ -31,11 +31,31 @@ O serviço escuta em http://localhost:3340. AUTH_ISSUER é a origem pública est
 | `/interaction/:uid/{details,login,…}` | Login e recuperação de senha para o front |
 | `/session/logout-details`             | Confirmação de logout para o front        |
 | `/health/live`                        | 200 quando o processo HTTP responde       |
-| `/health/ready`                       | Sempre 503 até a entrega da issue #15     |
+| `/health/ready`                       | 200 com banco e migrations prontos        |
 
 A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias desde o login.
 
-**Ainda não publicar em produção:** não há limite de tentativas de login nem readiness (#15).
+## Proteções
+
+| Ação                 | Limite por 15 minutos                                   |
+| -------------------- | ------------------------------------------------------- |
+| Senha recusada       | 5 por e-mail e endereço, 20 por e-mail, 50 por endereço |
+| Recuperação de senha | 3 por e-mail, 10 por endereço                           |
+| Recusas em `/token`  | 30 por endereço                                         |
+
+Exceder bloqueia por 1, 5, 15 e depois 60 minutos; um dia sem tentativas zera a reincidência. A resposta é 429 com `Retry-After`. O estado fica no Postgres, compartilhado entre réplicas, com e-mails e endereços gravados somente como hash. O endereço vem do proxy confiável (`AUTH_TRUST_PROXY=true`, um único proxy à frente).
+
+## Deploy
+
+O workflow **CD** é acionado manualmente a partir de `main`: publica a imagem, aplica as migrations, substitui o serviço na VPS, confere `https://auth.presencia.com.br/health/ready` e volta à versão anterior se falhar. Migrations não são desfeitas na volta.
+
+Preparação única no servidor e no GitHub:
+
+1. Segredos `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` e `GHCR_TOKEN`.
+2. DNS e certificado de `auth.presencia.com.br`.
+3. Em `/srv/presencia`, o serviço de `deploy/auth-presencia.compose.yaml` no compose, um banco Postgres dedicado e o arquivo `.env.auth-presencia` com leitura restrita.
+4. No proxy: `GET /interaction/{uid}`, `/logout`, `/logout/success` e `/error` vão para o front; o restante para a API, com `X-Forwarded-For` e `X-Forwarded-Proto`.
+5. Backups do banco, métricas e alertas.
 
 ## Cadastrar um produto
 

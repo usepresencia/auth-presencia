@@ -68,7 +68,7 @@ export function fakeGateway() {
     };
 }
 
-export async function buildTestApp({ gateway = fakeGateway() } = {}) {
+export async function buildTestApp({ gateway = fakeGateway(), settings = {} } = {}) {
     const database = await createTestDatabase();
     const port = await freePort();
     const issuer = 'http://127.0.0.1:' + port;
@@ -83,6 +83,7 @@ export async function buildTestApp({ gateway = fakeGateway() } = {}) {
         AUTH_CLIENTS: JSON.stringify([client]),
         FIREBASE_PROJECT_ID: 'demo-presencia',
         FIREBASE_API_KEY: 'fake-api-key',
+        ...settings,
     });
     const dist = '../../../dist/';
     const { AppModule } = await import(dist + 'app.module.js');

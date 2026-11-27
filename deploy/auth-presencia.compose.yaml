@@ -1,0 +1,18 @@
+# Serviço para incluir no docker compose da VPS (/srv/presencia).
+# As variáveis ficam em .env.auth-presencia, com as de .env.example e AUTH_PRESENCIA_TAG.
+services:
+    auth-presencia:
+        image: ghcr.io/usepresencia/auth-presencia:${AUTH_PRESENCIA_TAG}
+        restart: unless-stopped
+        env_file: .env.auth-presencia
+        expose:
+            - '3340'
+        healthcheck:
+            test:
+                - CMD
+                - node
+                - -e
+                - fetch('http://127.0.0.1:3340/health/ready').then(r => process.exit(r.ok ? 0: 1), () => process.exit(1))
+            interval: 30s
+            timeout: 5s
+            retries: 3
