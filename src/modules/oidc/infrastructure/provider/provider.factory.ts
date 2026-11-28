@@ -1,7 +1,7 @@
 import Provider, { errors, type Adapter, type Configuration } from 'oidc-provider';
 import type { Environment } from '../../../../shared/config/environment';
 import type { AccountService } from '../../../accounts/application/account.service';
-import { TTL } from '../../model/session-policy';
+import { SESSION_COOKIE, TTL } from '../../model/session-policy';
 import { accountSupport } from './accounts';
 import { clientRegistry } from './client-registry';
 import { redirectToFront } from './front-redirect';
@@ -43,7 +43,7 @@ export function createProvider(
         responseTypes: ['code'],
         clientAuthMethods: ['client_secret_basic'],
         jwks: env.AUTH_JWKS,
-        cookies: { keys: env.AUTH_COOKIE_KEYS },
+        cookies: { keys: env.AUTH_COOKIE_KEYS, long: SESSION_COOKIE },
         routes: { authorization: '/authorize' },
         scopes: ['openid', 'email', 'profile', 'offline_access'],
         claims: {

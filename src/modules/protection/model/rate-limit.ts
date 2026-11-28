@@ -42,6 +42,7 @@ export const LIMITS = {
     loginByAddress: rule('login:address', 50),
     resetByEmail: rule('reset:email', 3),
     resetByAddress: rule('reset:address', 10),
+    passwordByAddress: rule('password:address', 10),
     refusedTokenByAddress: rule('token:address', 30),
 };
 

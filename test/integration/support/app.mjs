@@ -25,6 +25,24 @@ export function fakeGateway() {
         calls: 0,
         resets: [],
         passwords: new Map(),
+        codes: new Map(),
+        passwordCode(email) {
+            const code = 'code-' + secret();
+            this.codes.set(code, email);
+            return code;
+        },
+        async definePassword(code, password) {
+            this.calls++;
+            if (this.down) throw new Error('firebase unavailable');
+            const email = this.codes.get(code);
+            if (!email) throw new SignInError('PASSWORD_CODE_INVALID');
+            const user = [...users.values()].find(item => item.email === email);
+            if (user.disabled) throw new SignInError('ACCOUNT_DISABLED');
+            if (password.length < 6) throw new SignInError('WEAK_PASSWORD');
+            this.codes.delete(code);
+            this.passwords.set(email, { uid: user.uid, password });
+            return email;
+        },
         addCredentials(uid, email, password) {
             this.passwords.set(email, { uid, password });
             return this.add(uid, { email });

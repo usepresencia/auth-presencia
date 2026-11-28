@@ -9,6 +9,8 @@ export const TTL = {
     SessionAbsolute: 14 * DAY,
 } as const;
 
+export const SESSION_COOKIE = { httpOnly: true, sameSite: 'lax' } as const;
+
 export const epochSeconds = () => Math.floor(Date.now() / 1000);
 
 export function absoluteRemaining(loginTs: number, now: number): number {

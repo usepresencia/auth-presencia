@@ -198,3 +198,25 @@ describe('headers and readiness', () => {
         }
     });
 });
+
+describe('browser session behind the proxy', () => {
+    it('marks the cookies as secure on HTTPS', async () => {
+        env.gateway.add('uid-proxied', { email: 'proxied@example.test' });
+        const response = await fetch(new URL('/password/define', env.issuer), {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                origin: env.issuer,
+                'x-forwarded-proto': 'https',
+            },
+            body: JSON.stringify({
+                code: env.gateway.passwordCode('proxied@example.test'),
+                password: 'chosen-password-123',
+            }),
+        });
+        assert.equal(response.status, 204);
+        const cookies = response.headers.getSetCookie();
+        assert.ok(cookies.length > 0);
+        for (const cookie of cookies) assert.match(cookie, /; secure/i);
+    });
+});

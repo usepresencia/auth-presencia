@@ -17,12 +17,13 @@ import { AuditModule } from '../audit/audit.module';
 import { LoginService } from './application/login.service';
 import { createPrismaAdapter } from './infrastructure/prisma-oidc.adapter';
 import { LogoutController } from './presentation/logout.controller';
+import { PasswordController } from './presentation/password.controller';
 import { createProvider } from './infrastructure/provider/provider.factory';
 import { createSessionExtension } from './infrastructure/prisma-session.extension';
 
 @Module({
     imports: [PersistenceModule, AccountsModule, ErrorsModule, ProtectionModule, AuditModule],
-    controllers: [InteractionController, LogoutController],
+    controllers: [InteractionController, LogoutController, PasswordController],
     providers: [
         {
             provide: LoginService,
