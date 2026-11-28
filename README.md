@@ -134,6 +134,15 @@ npx firebase emulators:exec --project demo-presencia 'npm run test:integration'
 
 A integração exige `INTEGRATION_DATABASE_URL` apontando para um banco Postgres dedicado cujo nome termine em `_test`.
 
+O pacote `@usepresencia/auth`, usado pelas APIs, é testado contra os tokens deste serviço. Ele fica isolado em `test/contract`, fora da imagem. Para rodar, exporte `NODE_AUTH_TOKEN` com um token do GitHub com escopo `read:packages`, faça `npm run build` e:
+
+```sh
+npm ci --prefix test/contract
+npx firebase emulators:exec --only auth,firestore --project demo-presencia 'npm run test:contract'
+```
+
+Para validar outra versão do pacote, altere a versão em `test/contract/package.json`.
+
 ## Docker
 
 ```sh

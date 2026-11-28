@@ -24,6 +24,7 @@
         "release": "standard-version",
         "prepare": "node scripts/prepare.mjs",
         "test:integration": "node --test test/integration/*.spec.mjs",
+        "test:contract": "node --test test/contract/*.spec.mjs",
         "db:migrate": "prisma migrate deploy",
         "prisma:generate": "prisma generate",
         "prisma:migrate": "prisma migrate dev",
