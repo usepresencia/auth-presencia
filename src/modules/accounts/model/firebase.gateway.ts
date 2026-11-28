@@ -16,4 +16,6 @@ export interface FirebaseGateway {
     getUser(uid: string): Promise<FirebaseUser | null>;
     signIn(email: string, password: string): Promise<VerifiedFirebaseIdentity>;
     sendPasswordReset(email: string): Promise<void>;
+    /** @returns o e-mail da conta cuja senha foi gravada. */
+    definePassword(code: string, password: string): Promise<string>;
 }

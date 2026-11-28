@@ -30,6 +30,12 @@ export class AccountService {
         await this.firebase.sendPasswordReset(email);
     }
 
+    /** @returns o `sub` da pessoa, já autenticada com a nova senha. */
+    async definePassword(code: string, password: string): Promise<string> {
+        const email = await this.firebase.definePassword(code, password);
+        return this.signIn(email, password);
+    }
+
     /**
      * Monta a conta usada nos tokens a partir da identidade e do Firebase.
      *

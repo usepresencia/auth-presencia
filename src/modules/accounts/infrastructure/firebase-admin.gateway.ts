@@ -33,10 +33,16 @@ const SIGN_IN_FAILURES: Record<string, SignInFailure> = {
     INVALID_EMAIL: 'INVALID_CREDENTIALS',
     USER_DISABLED: 'ACCOUNT_DISABLED',
     TOO_MANY_ATTEMPTS_TRY_LATER: 'TOO_MANY_ATTEMPTS',
+    INVALID_OOB_CODE: 'PASSWORD_CODE_INVALID',
+    EXPIRED_OOB_CODE: 'PASSWORD_CODE_INVALID',
+    WEAK_PASSWORD: 'WEAK_PASSWORD',
+    PASSWORD_DOES_NOT_MEET_REQUIREMENTS: 'WEAK_PASSWORD',
 };
 
 interface ToolkitResponse {
     idToken?: string;
+    email?: string;
+    requestType?: string;
     mfaPendingCredential?: string;
     error?: { message?: string };
 }
@@ -125,6 +131,29 @@ export class FirebaseAdminGateway implements FirebaseGateway, OnModuleDestroy {
         const code = errorCode(body);
         if (code === 'EMAIL_NOT_FOUND' || code === 'USER_DISABLED') return;
         throw this.failure(body);
+    }
+
+    /**
+     * Grava a senha usando um código de redefinição, depois de conferir o código e a conta:
+     * o Firebase aceitaria a troca mesmo com a conta desativada.
+     *
+     * @throws SignInError `PASSWORD_CODE_INVALID`, `ACCOUNT_DISABLED` ou `WEAK_PASSWORD`.
+     */
+    async definePassword(code: string, password: string): Promise<string> {
+        const checked = await this.toolkit('accounts:resetPassword', { oobCode: code });
+        if (checked.error) throw this.failure(checked);
+        if (checked.requestType !== 'PASSWORD_RESET' || !checked.email) {
+            throw new SignInError('PASSWORD_CODE_INVALID');
+        }
+        if ((await this.auth.getUserByEmail(checked.email)).disabled) {
+            throw new SignInError('ACCOUNT_DISABLED');
+        }
+        const changed = await this.toolkit('accounts:resetPassword', {
+            oobCode: code,
+            newPassword: password,
+        });
+        if (changed.error) throw this.failure(changed);
+        return checked.email;
     }
 
     private async toolkit(operation: string, payload: object): Promise<ToolkitResponse> {

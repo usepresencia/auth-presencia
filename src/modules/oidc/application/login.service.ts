@@ -6,26 +6,36 @@ import { AppError } from '../../errors/model/app.error';
 import type { AccountService } from '../../accounts/application/account.service';
 import { SignInError } from '../../accounts/model/sign-in.error';
 import type { RateLimiterService } from '../../protection/application/rate-limiter.service';
-import { LIMITS } from '../../protection/model/rate-limit';
+import { LIMITS, type RateLimitUse } from '../../protection/model/rate-limit';
 
-export interface LoginOrigin {
-    interactionUid: string;
-    clientId: string;
+export interface RequestOrigin {
+    clientId?: string;
     correlationId: string;
     address: string;
 }
 
-const context = ({ clientId, correlationId, address }: LoginOrigin) => ({
-    clientId,
+export interface LoginOrigin extends RequestOrigin {
+    interactionUid: string;
+    clientId: string;
+}
+
+const context = ({ clientId, correlationId, address }: RequestOrigin) => ({
+    ...(clientId ? { clientId } : {}),
     correlationId,
     address,
 });
+
+const reasonOf = (error: unknown) =>
+    error instanceof SignInError || error instanceof AppError ? error.code : 'AUTH_UNAVAILABLE';
 
 export class LoginService {
     private readonly signingIn = new Map<string, Promise<string>>();
 
     constructor(
-        private readonly accounts: Pick<AccountService, 'signIn' | 'sendPasswordReset'>,
+        private readonly accounts: Pick<
+            AccountService,
+            'signIn' | 'sendPasswordReset' | 'definePassword'
+        >,
         private readonly limiter: RateLimiterService,
         private readonly audit: AuditService,
     ) {}
@@ -60,6 +70,31 @@ export class LoginService {
         await this.audit.record({ type: 'password_reset_requested', email, ...context(origin) });
     }
 
+    /**
+     * Grava a senha com um código de uso único e autentica a pessoa.
+     *
+     * @returns o `sub` da pessoa.
+     * @throws AppError `TOO_MANY_ATTEMPTS` quando o endereço excedeu o limite de recusas.
+     */
+    async definePassword(code: string, password: string, origin: RequestOrigin): Promise<string> {
+        const uses = [{ rule: LIMITS.passwordByAddress, subject: origin.address }];
+        try {
+            const identityId = await this.counted(uses, () =>
+                this.accounts.definePassword(code, password),
+            );
+            await this.bestEffort(this.limiter.refund(uses));
+            await this.audit.record({ type: 'password_defined', identityId, ...context(origin) });
+            return identityId;
+        } catch (error) {
+            await this.audit.record({
+                type: 'password_definition_failed',
+                reason: reasonOf(error),
+                ...context(origin),
+            });
+            throw error;
+        }
+    }
+
     private async auditedSignIn(email: string, password: string, origin: LoginOrigin) {
         try {
             const identityId = await this.limitedSignIn(email, password, origin.address);
@@ -71,16 +106,12 @@ export class LoginService {
             });
             return identityId;
         } catch (error) {
-            const reason =
-                error instanceof SignInError || error instanceof AppError
-                    ? error.code
-                    : 'AUTH_UNAVAILABLE';
+            const reason = reasonOf(error);
             await this.audit.record({ type: 'login_failed', reason, email, ...context(origin) });
             throw error;
         }
     }
 
-    /** Conta a tentativa antes de testar a senha e a devolve se a falha não for uma recusa. */
     private async limitedSignIn(email: string, password: string, address: string) {
         const own = {
             rule: LIMITS.loginByEmailAndAddress,
@@ -90,19 +121,25 @@ export class LoginService {
             { rule: LIMITS.loginByEmail, subject: email },
             { rule: LIMITS.loginByAddress, subject: address },
         ];
-        await this.limiter.consume([own, ...shared]);
-        let accountId: string;
-        try {
-            accountId = await this.accounts.signIn(email, password);
-        } catch (error) {
-            if (!(error instanceof SignInError)) {
-                await this.bestEffort(this.limiter.refund([own, ...shared]));
-            }
-            throw error;
-        }
+        const accountId = await this.counted([own, ...shared], () =>
+            this.accounts.signIn(email, password),
+        );
         await this.bestEffort(this.limiter.clear(own));
         await this.bestEffort(this.limiter.refund(shared));
         return accountId;
+    }
+
+    /** Conta a tentativa antes de executá-la e a devolve se a falha não for uma recusa. */
+    private async counted<T>(uses: RateLimitUse[], attempt: () => Promise<T>): Promise<T> {
+        await this.limiter.consume(uses);
+        try {
+            return await attempt();
+        } catch (error) {
+            if (!(error instanceof SignInError)) {
+                await this.bestEffort(this.limiter.refund(uses));
+            }
+            throw error;
+        }
     }
 
     private bestEffort(adjustment: Promise<void>): Promise<void> {

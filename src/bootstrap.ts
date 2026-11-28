@@ -19,7 +19,7 @@ export function configureApp(app: NestExpressApplication): void {
     app.use(securityHeaders(config.get('AUTH_ISSUER', { infer: true })));
     app.use(tokenRateLimit(app.get(RateLimiterService)));
     app.use(
-        '/interaction',
+        ['/interaction', '/password'],
         (_request: Request, response: Response, next: NextFunction) => {
             response.setHeader('cache-control', 'no-store');
             next();

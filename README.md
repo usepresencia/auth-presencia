@@ -30,10 +30,13 @@ O serviço escuta em http://localhost:3340. AUTH_ISSUER é a origem pública est
 | `/token/revocation`, `/session/end`   | Revogação e logout                        |
 | `/interaction/:uid/{details,login,…}` | Login e recuperação de senha para o front |
 | `/session/logout-details`             | Confirmação de logout para o front        |
+| `/password/define`                    | Primeira senha com código de uso único    |
 | `/health/live`                        | 200 quando o processo HTTP responde       |
 | `/health/ready`                       | 200 com banco e migrations prontos        |
 
 A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias desde o login.
+
+`POST /password/define` recebe `{ "code", "password" }` somente da origem do auth. O código é o de redefinição de senha do Firebase, gerado pelo produto no mesmo projeto. A resposta 204 grava a senha e abre a sessão, encerrando a anterior do navegador; o retorno ao produto é do front. Recusas: `PASSWORD_CODE_INVALID` (410), `WEAK_PASSWORD` (400) e `ACCOUNT_DISABLED` (403).
 
 ## Proteções
 
@@ -42,12 +45,13 @@ A sessão dura 7 dias sem uso, renovados pelo refresh token, com teto de 14 dias
 | Senha recusada       | 5 por e-mail e endereço, 20 por e-mail, 50 por endereço |
 | Recuperação de senha | 3 por e-mail, 10 por endereço                           |
 | Recusas em `/token`  | 30 por endereço                                         |
+| Definição de senha   | 10 recusas por endereço                                 |
 
 Exceder bloqueia por 1, 5, 15 e depois 60 minutos; um dia sem tentativas zera a reincidência. A resposta é 429 com `Retry-After`. O estado fica no Postgres, compartilhado entre réplicas, com e-mails e endereços gravados somente como hash. O endereço vem do proxy confiável (`AUTH_TRUST_PROXY=true`, um único proxy à frente).
 
 ## Auditoria
 
-A tabela `auth_audit_events` registra login, falha de login (com o motivo), pedido de recuperação de senha, logout e reuso de token ou código, com pessoa, client e correlation id quando conhecidos (no reuso de authorization code a pessoa não é identificada). E-mail e endereço são gravados somente como hash, e nenhum token é gravado. Eventos com mais de 90 dias são removidos. A falha ao auditar não interrompe o login.
+A tabela `auth_audit_events` registra login, falha de login (com o motivo), pedido de recuperação de senha, definição de senha (e a recusa), logout e reuso de token ou código, com pessoa, client e correlation id quando conhecidos (no reuso de authorization code a pessoa não é identificada). E-mail e endereço são gravados somente como hash, e nenhum token é gravado. Eventos com mais de 90 dias são removidos. A falha ao auditar não interrompe o login.
 
 ## Deploy
 
@@ -63,7 +67,7 @@ Preparação única no servidor e no GitHub:
 
     Todo comando manual precisa de `docker compose --env-file .env.auth-presencia`.
 
-4. No Traefik global, a API recebe somente `/.well-known`, `/jwks`, `/authorize`, `/token`, `/session`, `/health` e `/interaction/{uid}/...`; `/interaction/{uid}`, `/logout`, `/logout/success` e `/error` ficam para o front. O Traefik não deve confiar em `X-Forwarded-*` vindos da internet, pois os limites dependem do endereço real.
+4. No Traefik global, a API recebe somente `/.well-known`, `/jwks`, `/authorize`, `/token`, `/session`, `/health`, `/password/define` e `/interaction/{uid}/...`; `/interaction/{uid}`, `/logout`, `/logout/success` e `/error` ficam para o front. O Traefik não deve confiar em `X-Forwarded-*` vindos da internet, pois os limites dependem do endereço real.
 5. Backups do banco, métricas e alertas.
 
 ## Cadastrar um produto

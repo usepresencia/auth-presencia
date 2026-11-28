@@ -2,6 +2,8 @@ export type AuditEventType =
     | 'login_succeeded'
     | 'login_failed'
     | 'password_reset_requested'
+    | 'password_defined'
+    | 'password_definition_failed'
     | 'token_reuse_detected'
     | 'logout';
 

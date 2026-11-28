@@ -16,6 +16,11 @@ export const ERRORS = {
     NOT_FOUND: { status: 404, message: 'Recurso não encontrado.' },
     INTERACTION_EXPIRED: { status: 410, message: 'O login expirou. Recomece pelo produto.' },
     LOGOUT_EXPIRED: { status: 410, message: 'Não há logout pendente.' },
+    PASSWORD_CODE_INVALID: {
+        status: 410,
+        message: 'O link para criar a senha expirou ou já foi usado.',
+    },
+    WEAK_PASSWORD: { status: 400, message: 'Senha fraca. Escolha uma senha mais forte.' },
     TOO_MANY_ATTEMPTS: { status: 429, message: 'Muitas tentativas. Aguarde e tente novamente.' },
     HTTP_ERROR: { status: 400, message: 'Não foi possível concluir a requisição.' },
     INTERNAL_ERROR: { status: 500, message: 'Erro interno no servidor.' },
